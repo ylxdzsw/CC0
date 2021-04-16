@@ -1,0 +1,9 @@
+.vscode
+Cargo.lock
+target
+build
+package-lock.json
+node_modules
+dist
+*.wasm
+output.svg
