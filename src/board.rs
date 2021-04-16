@@ -2,19 +2,18 @@
 
 use crate::Position;
 
-trait Board {
+pub trait Board {
     fn rank() -> usize;
-    fn n_pos() -> usize;
+    fn board_size() -> usize;
     fn n_pieces() -> usize {
         (1..=Self::rank()).sum()
     }
-    fn adj(center: &Position) -> &[Position];
-    fn self_base_ids() -> &'static [Position];
-    fn oppo_base_ids() -> &'static [Position];
+    fn adj(center: Position) -> &'static [Position];
+    fn base_ids() -> (&'static [Position], &'static [Position]);
 }
 
 /// The standard board has 10 slots in each corner
-struct StandardBoard;
+pub struct StandardBoard;
 impl StandardBoard {
     const ADJ_MATRIX: [[i8; 6]; 121] = [
         [1,2,-1,-1,-1,-1],
@@ -139,26 +138,22 @@ impl StandardBoard {
         [120,-1,-1,117,116,118],
         [-1,-1,-1,119,118,-1]
     ];
-    const SELF_BASE_IDS: [Position; 10] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
-    const OPPO_BASE_IDS: [Position; 10] = [111, 112, 113, 114, 115, 116, 117, 118, 119, 120];
+    const BASE_IDS: ([Position; 10], [Position; 10]) = ([0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [111, 112, 113, 114, 115, 116, 117, 118, 119, 120]);
 }
 
 impl Board for StandardBoard {
     fn rank() -> usize { 4 }
-    fn n_pos() -> usize { 121 }
-    fn adj(center: &Position) -> &[Position] {
-        &Self::ADJ_MATRIX[*center as usize]
+    fn board_size() -> usize { 121 }
+    fn adj(center: Position) -> &'static [Position] {
+        &Self::ADJ_MATRIX[center as usize]
     }
-    fn self_base_ids() -> &'static [Position] {
-        &Self::SELF_BASE_IDS
-    }
-    fn oppo_base_ids() -> &'static [Position] {
-        &Self::OPPO_BASE_IDS
+    fn base_ids() -> (&'static [Position], &'static [Position]) {
+        (&Self::BASE_IDS.0, &Self::BASE_IDS.1)
     }
 }
 
 /// The small board has only 6 slots in each corner
-struct SmallBoard;
+pub struct SmallBoard;
 impl SmallBoard {
     const ADJ_MATRIX: [[i8; 6]; 73] = [
         [1,2,-1,-1,-1,-1],
@@ -235,20 +230,16 @@ impl SmallBoard {
         [72,-1,-1,69,68,70],
         [-1,-1,-1,71,70,-1]
     ];
-    const SELF_BASE_IDS: [Position; 6] = [0, 1, 2, 3, 4, 5];
-    const OPPO_BASE_IDS: [Position; 6] = [67, 68, 69, 70, 71, 72];
+    const BASE_IDS: ([Position; 6], [Position; 6]) = ([0, 1, 2, 3, 4, 5], [67, 68, 69, 70, 71, 72]);
 }
 
 impl Board for SmallBoard {
     fn rank() -> usize { 3 }
-    fn n_pos() -> usize { 73 }
-    fn adj(center: &Position) -> &[Position] {
-        &Self::ADJ_MATRIX[*center as usize]
+    fn board_size() -> usize { 73 }
+    fn adj(center: Position) -> &'static [Position] {
+        &Self::ADJ_MATRIX[center as usize]
     }
-    fn self_base_ids() -> &'static [Position] {
-        &Self::SELF_BASE_IDS
-    }
-    fn oppo_base_ids() -> &'static [Position] {
-        &Self::OPPO_BASE_IDS
+    fn base_ids() -> (&'static [Position], &'static [Position]) {
+        (&Self::BASE_IDS.0, &Self::BASE_IDS.1)
     }
 }

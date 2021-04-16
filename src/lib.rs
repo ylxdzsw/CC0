@@ -1,13 +1,12 @@
 #[cfg(target_arch="wasm32")]
-extern crate alloc;
-
-#[cfg(target_arch="wasm32")]
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 type Position = i8;
+const INVALID_POSITION: Position = -1;
 
 mod board;
+mod game;
 
 #[no_mangle]
 pub unsafe extern fn alloc_memory(byte_size: u64) -> *mut u8 {
