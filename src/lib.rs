@@ -5,7 +5,7 @@ extern crate alloc;
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
-type Position = u8;
+type Position = i8;
 
 mod board;
 

@@ -68,7 +68,40 @@ function write_svg(nodes)
         </svg>
     """
 
-    open("output.svg", "w") do f
+    open("board.svg", "w") do f
         write(f, strip(svg))
     end
+end
+
+# each row in the adj_matrix is the id of neibours of that node, in the order of UL, UR, R, LR, LL, L
+function gen_adj_matrix(nodes)
+    dict = Dict((n.x, n.y) => n.id for n in nodes)
+    mat = Matrix{Int}(undef, length(nodes), 6)
+    for n in nodes
+        UL = get(dict, (n.x-1, n.y+1), -1)
+        UR = get(dict, (n.x,   n.y+1), -1)
+        R  = get(dict, (n.x+1, n.y), -1)
+        LR = get(dict, (n.x+1, n.y-1), -1)
+        LL = get(dict, (n.x,   n.y-1), -1)
+        L  = get(dict, (n.x-1, n.y), -1)
+        mat[n.id+1, :] .= UL, UR, R, LR, LL, L
+    end
+    mat
+end
+
+function write_adj_matrix(mat)
+    buf = IOBuffer()
+    buf << '['
+    for i in 1:size(mat)[1]
+        buf << "[$(join(mat[i, :], ','))],\n"
+    end
+    skip(buf, -2)
+    buf << ']'
+    take!(buf) |> String
+end
+
+function gen_base_ids(nodes, rank)
+    self_base_ids = sort([node.id for node in nodes])[1:sum(1:rank)]
+    oppo_base_ids = reverse(reverse(sort([node.id for node in nodes]))[1:sum(1:rank)])
+    self_base_ids, oppo_base_ids
 end
