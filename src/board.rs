@@ -3,14 +3,14 @@
 use crate::Position;
 
 pub trait Board {
-    fn rank() -> usize;
-    fn board_size() -> usize;
-    fn n_pieces() -> usize {
-        (1..=Self::rank()).sum()
+    fn rank(&self) -> usize;
+    fn board_size(&self) -> usize;
+    fn n_pieces(&self) -> usize {
+        (1..=self.rank()).sum()
     }
-    fn turn_limit() -> usize;
-    fn adj(center: Position) -> &'static [Position];
-    fn base_ids() -> (&'static [Position], &'static [Position]);
+    fn turn_limit(&self) -> usize;
+    fn adj(&self, center: Position) -> &'static [Position];
+    fn base_ids(&self) -> (&'static [Position], &'static [Position]);
 }
 
 /// The standard board has 10 slots in each corner
@@ -143,16 +143,18 @@ impl StandardBoard {
 }
 
 impl Board for StandardBoard {
-    fn rank() -> usize { 4 }
-    fn board_size() -> usize { 121 }
-    fn turn_limit() -> usize { 40 }
-    fn adj(center: Position) -> &'static [Position] {
+    fn rank(&self) -> usize { 4 }
+    fn board_size(&self) -> usize { 121 }
+    fn turn_limit(&self) -> usize { 40 }
+    fn adj(&self, center: Position) -> &'static [Position] {
         &Self::ADJ_MATRIX[center as usize]
     }
-    fn base_ids() -> (&'static [Position], &'static [Position]) {
+    fn base_ids(&self) -> (&'static [Position], &'static [Position]) {
         (&Self::BASE_IDS.0, &Self::BASE_IDS.1)
     }
 }
+
+pub const STANDARD_BOARD: StandardBoard = StandardBoard;
 
 /// The small board has only 6 slots in each corner
 pub struct SmallBoard;
@@ -236,13 +238,15 @@ impl SmallBoard {
 }
 
 impl Board for SmallBoard {
-    fn rank() -> usize { 3 }
-    fn board_size() -> usize { 73 }
-    fn turn_limit() -> usize { 30 }
-    fn adj(center: Position) -> &'static [Position] {
+    fn rank(&self) -> usize { 3 }
+    fn board_size(&self) -> usize { 73 }
+    fn turn_limit(&self) -> usize { 30 }
+    fn adj(&self, center: Position) -> &'static [Position] {
         &Self::ADJ_MATRIX[center as usize]
     }
-    fn base_ids() -> (&'static [Position], &'static [Position]) {
+    fn base_ids(&self) -> (&'static [Position], &'static [Position]) {
         (&Self::BASE_IDS.0, &Self::BASE_IDS.1)
     }
 }
+
+pub const SMALL_BOARD: SmallBoard = SmallBoard;

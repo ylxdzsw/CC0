@@ -1,6 +1,6 @@
 use core::usize;
 
-use crate::{Position, INVALID_POSITION, board::Board};
+use crate::{INVALID_POSITION, Position, board::Board};
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum Player { First, Second }
@@ -24,47 +24,48 @@ impl Piece {
     }
 }
 
-pub struct Game<B: Board> {
-    phantom: core::marker::PhantomData<B>,
+pub struct Game {
+    board_def: &'static dyn Board,
     pieces: Vec<Piece>,
-    board: Vec<Option<usize>>, // `pieces` is the primary state, `board` is just an position -> piece index
+    pindex: Vec<Option<usize>>, // position -> piece index
     player: Player, // current player. the First player plays first.
     total_moves: usize
 }
 
-impl<B: Board> Game<B> {
-    pub fn new() -> Self {
+impl Game {
+    pub fn new(board_def: &'static dyn Board) -> Self {
         let mut pieces = vec![];
-        let mut board = vec![None; B::board_size()];
+        let mut pindex = vec![None; board_def.board_size()];
 
-        for &i in B::base_ids().0 {
-            board[i as usize] = Some(pieces.len());
+        for &i in board_def.base_ids().0 {
+            pindex[i as usize] = Some(pieces.len());
             pieces.push(Piece::new(Player::First, i));
         }
-        for &i in B::base_ids().1 {
-            board[i as usize] = Some(pieces.len());
+        for &i in board_def.base_ids().1 {
+            pindex[i as usize] = Some(pieces.len());
             pieces.push(Piece::new(Player::Second, i))
         }
 
-        debug_assert_eq!(pieces.len(), 2 * B::n_pieces());
+        debug_assert_eq!(pieces.len(), 2 * board_def.n_pieces());
 
-        Game {
-            phantom: core::marker::PhantomData,
-            pieces: vec![],
-            board: vec![None; B::board_size()],
-            player: Player::First,
-            total_moves: 0
-        }
+        Game { board_def, pieces, pindex, player: Player::First, total_moves: 0 }
     }
 
     pub fn reset(&mut self) {
-        *self = Game::new()
+        *self = Game::new(self.board_def)
     }
 
-    /// find possible moves of p by BFS. result[i] = j means p can move to i via j. -1 means impossible move.
-    pub fn possible_moves(&self, pos: Position) -> Vec<Position> {
-        let p = &self.pieces[self.board[pos as usize].unwrap()];
-        let mut result = vec![INVALID_POSITION; B::board_size()];
+    pub fn rank(&self) -> usize { self.board_def.rank() }
+    pub fn board_size(&self) -> usize { self.board_def.board_size() }
+    pub fn n_pieces(&self) -> usize { self.board_def.n_pieces() }
+    pub fn turn_limit(&self) -> usize { self.board_def.turn_limit() }
+    pub fn adj(&self, center: Position) -> &'static [Position] { self.board_def.adj(center) }
+    pub fn base_ids(&self) -> (&'static [Position], &'static [Position]) { self.board_def.base_ids()}
+
+    /// find possible moves of p by BFS. result[i] = j means p can move to i via j. INVALID_POSITION means impossible move.
+    pub fn possible_moves_with_path(&self, pos: Position) -> Vec<Position> {
+        let p = &self.pieces[self.pindex[pos as usize].unwrap()];
+        let mut result = vec![INVALID_POSITION; self.board_def.board_size()];
         let mut queue = vec![p.position];
         result[p.position as usize] = p.position;
 
@@ -75,12 +76,12 @@ impl<B: Board> Game<B> {
                 let mut hopping_started = false;
 
                 loop {
-                    cp = B::adj(cp)[direction];
+                    cp = self.board_def.adj(cp)[direction];
                     if cp == INVALID_POSITION {
                         break
                     }
 
-                    match (&self.board[cp as usize], hopping_started, steps) {
+                    match (&self.pindex[cp as usize], hopping_started, steps) {
                         (Some(_), true, _) => break, // encounter obstacle, stop
                         (Some(_), false, _) => hopping_started = true, // start hopping
                         (None, true, 0) => { // hopping succeed
@@ -100,8 +101,8 @@ impl<B: Board> Game<B> {
 
         // append single moves
         for direction in 0..6 {
-            let next = B::adj(p.position)[direction];
-            if next == INVALID_POSITION || self.board[next as usize].is_some() {
+            let next = self.board_def.adj(p.position)[direction];
+            if next == INVALID_POSITION || self.pindex[next as usize].is_some() {
                 continue
             }
 
@@ -109,6 +110,14 @@ impl<B: Board> Game<B> {
         }
 
         result
+    }
+
+    pub fn possible_moves(&self, pos: Position) -> Vec<Position> {
+        self.possible_moves_with_path(pos).into_iter()
+            .enumerate()
+            .filter(|&(i, p)| p != INVALID_POSITION && pos != i as _)
+            .map(|(i, _)| i as _)
+            .collect()
     }
 
     pub fn all_pieces_and_possible_moves_of_current_player(&self) -> Vec<(Position, Vec<Position>)> {
@@ -120,21 +129,21 @@ impl<B: Board> Game<B> {
     }
 
     pub fn move_with_role_change(&mut self, from: Position, to: Position) {
-        debug_assert!(self.board[to as usize].is_none()); // target location empty
+        debug_assert!(self.pindex[to as usize].is_none()); // target location empty
 
-        let pid = self.board[from as usize].take().unwrap(); // the board updated once here
+        let pid = self.pindex[from as usize].take().unwrap(); // the board updated once here
         let piece = &mut self.pieces[pid];
         debug_assert_eq!(piece.owner, self.player); // it is the piece of the current player
 
         piece.position = to;
         self.player.change();
         self.total_moves += 1;
-        self.board[to as usize] = Some(pid);
+        self.pindex[to as usize] = Some(pid);
     }
 
     pub fn finished(&self) -> bool {
         let (w1, w2) = self.score();
-        w1 == B::n_pieces() || w2 == B::n_pieces() || self.total_moves >= 2 * B::turn_limit()
+        w1 == self.board_def.n_pieces() || w2 == self.board_def.n_pieces() || self.total_moves >= 2 * self.board_def.turn_limit()
     }
 
     // evaluate the pieces that are in the opponents base
@@ -142,8 +151,8 @@ impl<B: Board> Game<B> {
         let mut w1 = 0;
         let mut w2 = 0;
         for p in &self.pieces {
-            if p.owner == Player::First && B::base_ids().1.contains(&p.position) { w1 += 1; }
-            if p.owner == Player::Second && B::base_ids().0.contains(&p.position) { w2 += 1; }
+            if p.owner == Player::First && self.board_def.base_ids().1.contains(&p.position) { w1 += 1; }
+            if p.owner == Player::Second && self.board_def.base_ids().0.contains(&p.position) { w2 += 1; }
         }
         (w1, w2)
     }
@@ -155,30 +164,30 @@ mod tests {
 
     #[test]
     fn game_test_1() {
-        let mut game = Game::<crate::board::StandardBoard>::new();
+        let mut game = Game::new(&crate::board::STANDARD_BOARD);
         let mut possible_moves;
 
-        possible_moves = game.possible_moves(8);
+        possible_moves = game.possible_moves_with_path(8);
         for &p in &[16, 17] { assert!(possible_moves[p] != INVALID_POSITION) }
         game.move_with_role_change(8, 16);
 
-        possible_moves = game.possible_moves(114);
+        possible_moves = game.possible_moves_with_path(114);
         for &p in &[105, 106] { assert!(possible_moves[p] != INVALID_POSITION) }
         game.move_with_role_change(114, 106);
 
-        possible_moves = game.possible_moves(5);
+        possible_moves = game.possible_moves_with_path(5);
         for &p in &[8, 18, 39] { assert!(possible_moves[p] != INVALID_POSITION) }
         game.move_with_role_change(5, 39);
 
-        possible_moves = game.possible_moves(117);
+        possible_moves = game.possible_moves_with_path(117);
         for &p in &[83, 114] { assert!(possible_moves[p] != INVALID_POSITION) }
         game.move_with_role_change(117, 83);
 
-        possible_moves = game.possible_moves(0);
+        possible_moves = game.possible_moves_with_path(0);
         for &p in &[5, 14, 18, 60] { assert!(possible_moves[p] != INVALID_POSITION) }
         game.move_with_role_change(0, 60);
 
-        possible_moves = game.possible_moves(115);
+        possible_moves = game.possible_moves_with_path(115);
         for &p in &[58, 62, 102, 104, 108, 117] { assert!(possible_moves[p] != INVALID_POSITION) }
     }
 }
