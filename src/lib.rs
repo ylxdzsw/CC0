@@ -2,8 +2,8 @@
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
-type Position = i8;
-const INVALID_POSITION: Position = -1;
+type Position = u8; // huge board (rank 6) have 253 slots, u8 is just perfect.
+const INVALID_POSITION: Position = Position::MAX;
 
 mod board;
 mod game;
@@ -48,9 +48,9 @@ pub unsafe extern fn do_move(game: *mut game::Game<board::StandardBoard>, from: 
     if game.finished() {
         let (w1, w2) = game.score();
         match w1.cmp(&w2) {
-            std::cmp::Ordering::Equal => 3,
             std::cmp::Ordering::Greater => 1,
             std::cmp::Ordering::Less => 2,
+            std::cmp::Ordering::Equal => 3,
         }
     } else {
         0

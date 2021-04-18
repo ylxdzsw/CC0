@@ -78,12 +78,12 @@ function gen_adj_matrix(nodes)
     dict = Dict((n.x, n.y) => n.id for n in nodes)
     mat = Matrix{Int}(undef, length(nodes), 6)
     for n in nodes
-        UL = get(dict, (n.x-1, n.y+1), -1)
-        UR = get(dict, (n.x,   n.y+1), -1)
-        R  = get(dict, (n.x+1, n.y), -1)
-        LR = get(dict, (n.x+1, n.y-1), -1)
-        LL = get(dict, (n.x,   n.y-1), -1)
-        L  = get(dict, (n.x-1, n.y), -1)
+        UL = get(dict, (n.x-1, n.y+1), 255)
+        UR = get(dict, (n.x,   n.y+1), 255)
+        R  = get(dict, (n.x+1, n.y), 255)
+        LR = get(dict, (n.x+1, n.y-1), 255)
+        LL = get(dict, (n.x,   n.y-1), 255)
+        L  = get(dict, (n.x-1, n.y), 255)
         mat[n.id+1, :] .= UL, UR, R, LR, LL, L
     end
     mat
