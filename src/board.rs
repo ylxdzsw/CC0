@@ -8,6 +8,7 @@ pub trait Board {
     fn n_pieces() -> usize {
         (1..=Self::rank()).sum()
     }
+    fn turn_limit() -> usize;
     fn adj(center: Position) -> &'static [Position];
     fn base_ids() -> (&'static [Position], &'static [Position]);
 }
@@ -144,6 +145,7 @@ impl StandardBoard {
 impl Board for StandardBoard {
     fn rank() -> usize { 4 }
     fn board_size() -> usize { 121 }
+    fn turn_limit() -> usize { 40 }
     fn adj(center: Position) -> &'static [Position] {
         &Self::ADJ_MATRIX[center as usize]
     }
@@ -236,6 +238,7 @@ impl SmallBoard {
 impl Board for SmallBoard {
     fn rank() -> usize { 3 }
     fn board_size() -> usize { 73 }
+    fn turn_limit() -> usize { 30 }
     fn adj(center: Position) -> &'static [Position] {
         &Self::ADJ_MATRIX[center as usize]
     }

@@ -3,7 +3,7 @@ use core::usize;
 use crate::{Position, INVALID_POSITION, board::Board};
 
 #[derive(Debug, Eq, PartialEq)]
-enum Player { First, Second }
+pub enum Player { First, Second }
 impl Player {
     fn change(&mut self) {
         match *self {
@@ -13,9 +13,9 @@ impl Player {
     }
 }
 
-struct Piece {
-    owner: Player,
-    position: Position
+pub struct Piece {
+    pub owner: Player,
+    pub position: Position
 }
 
 impl Piece {
@@ -34,28 +34,31 @@ pub struct Game<B: Board> {
 
 impl<B: Board> Game<B> {
     pub fn new() -> Self {
-        let mut game = Game {
+        let mut pieces = vec![];
+        let mut board = vec![None; B::board_size()];
+
+        for &i in B::base_ids().0 {
+            board[i as usize] = Some(pieces.len());
+            pieces.push(Piece::new(Player::First, i));
+        }
+        for &i in B::base_ids().1 {
+            board[i as usize] = Some(pieces.len());
+            pieces.push(Piece::new(Player::Second, i))
+        }
+
+        debug_assert_eq!(pieces.len(), 2 * B::n_pieces());
+
+        Game {
             phantom: core::marker::PhantomData,
             pieces: vec![],
             board: vec![None; B::board_size()],
             player: Player::First,
             total_moves: 0
-        };
-        game.reset();
-        game
-
+        }
     }
 
     pub fn reset(&mut self) {
-        self.pieces.clear();
-        for &i in B::base_ids().0 {
-            self.board[i as usize] = Some(self.pieces.len());
-            self.pieces.push(Piece::new(Player::First, i));
-        }
-        for &i in B::base_ids().1 {
-            self.board[i as usize] = Some(self.pieces.len());
-            self.pieces.push(Piece::new(Player::Second, i))
-        }
+        *self = Game::new()
     }
 
     /// find possible moves of p by BFS. result[i] = j means p can move to i via j. -1 means impossible move.
@@ -108,12 +111,20 @@ impl<B: Board> Game<B> {
         result
     }
 
+    pub fn all_pieces_and_possible_moves_of_current_player(&self) -> Vec<(Position, Vec<Position>)> {
+        self.pieces.iter()
+            .filter(|p| p.owner == self.player)
+            .map(|p| p.position)
+            .map(|pos| (pos, self.possible_moves(pos)))
+            .collect()
+    }
+
     pub fn move_with_role_change(&mut self, from: Position, to: Position) {
-        assert!(self.board[to as usize].is_none()); // target location empty
+        debug_assert!(self.board[to as usize].is_none()); // target location empty
 
         let pid = self.board[from as usize].take().unwrap(); // the board updated once here
         let piece = &mut self.pieces[pid];
-        assert_eq!(piece.owner, self.player); // it is the piece of the current player
+        debug_assert_eq!(piece.owner, self.player); // it is the piece of the current player
 
         piece.position = to;
         self.player.change();
@@ -123,7 +134,7 @@ impl<B: Board> Game<B> {
 
     pub fn finished(&self) -> bool {
         let (w1, w2) = self.score();
-        w1 == B::n_pieces() || w2 == B::n_pieces()
+        w1 == B::n_pieces() || w2 == B::n_pieces() || self.total_moves >= 2 * B::turn_limit()
     }
 
     // evaluate the pieces that are in the opponents base
