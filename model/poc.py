@@ -10,7 +10,7 @@ try:
 except:
     data = []
 
-    while len(data) < 5000:
+    while len(data) < 200000:
         env = Environment()
         for i in range(200):
             env.random_move()
@@ -29,10 +29,10 @@ class TransformerClassifier(torch.nn.Module):
     def __init__(self, board_size):
         super(TransformerClassifier, self).__init__()
         self._board_size = board_size
-        self.embedding = torch.nn.Embedding(board_size+1, 64-3)
-        encoder_layer = torch.nn.TransformerEncoderLayer(64, nhead=8, dim_feedforward=256)
-        self.encoder = torch.nn.TransformerEncoder(encoder_layer, 6)
-        self.decoder = torch.nn.Linear(64, board_size)
+        self.embedding = torch.nn.Embedding(board_size+1, 192-3)
+        encoder_layer = torch.nn.TransformerEncoderLayer(192, nhead=6, dim_feedforward=256)
+        self.encoder = torch.nn.TransformerEncoder(encoder_layer, 8)
+        self.decoder = torch.nn.Linear(192, board_size)
         self.activation = torch.nn.Sigmoid()
 
     def forward(self, pieces, masks):
@@ -43,19 +43,19 @@ class TransformerClassifier(torch.nn.Module):
         x = self.activation(x)
         return x
 
-training_set = data[:-1000]
-test_set = data[-1000:]
+training_set = data[:-5000]
+test_set = data[-5000:]
 
-def get_batch(dataset, batch_size, randomize=True):
+def get_batch(dataset, batch_size, start=-1):
     pieces = np.zeros((batch_size, 21), dtype=np.int32)
     masks = np.zeros((batch_size, 21, 3), dtype=np.int32)
     y = np.zeros((batch_size, 121), dtype=np.float32)
 
     for i in range(batch_size):
-        if randomize:
+        if start < 0:
             index = np.random.randint(len(dataset))
         else:
-            index = i
+            index = start + i
         self_pieces, oppo_pieces, pos, moves = dataset[index]
         pieces[i, 0] = 121 # the special token
         for j, p in enumerate(self_pieces):
@@ -75,22 +75,32 @@ def get_batch(dataset, batch_size, randomize=True):
 
 model = TransformerClassifier(121).cuda()
 loss = torch.nn.BCELoss()
-optimizer = torch.optim.SGD(model.parameters(), lr=.2)
+optimizer = torch.optim.Adam(model.parameters(), lr=3e-5)
+best = 0
 
-for epoch in range(1000):
+for epoch in range(50000):
     model.train()
-    pieces, masks, y = get_batch(training_set, 100)
+    pieces, masks, y = get_batch(training_set, 256)
     p = model(torch.from_numpy(pieces).cuda(), torch.from_numpy(masks).cuda())
     L = loss(p, torch.from_numpy(y).cuda())
-    print(L)
     L.backward()
     torch.nn.utils.clip_grad_norm_(model.parameters(), .6)
     optimizer.step()
-    # if epoch % 10 == 0:
-    #     model.eval()
-    #     with torch.no_grad():
-    #         pieces, masks, y = get_batch(test_set, 1000, False)
-    #         p = model(pieces, masks)
-    #         for i in range(1000):
-    #             if p[i] > .5 and y[i]
+    if epoch % 100 == 0:
+        model.eval()
+        with torch.no_grad():
+            pieces, masks, y = get_batch(test_set, 5000, 0)
+            p = model(torch.from_numpy(pieces).cuda(), torch.from_numpy(masks).cuda())
+            p = (p > .5).cpu().numpy()
+            acc = sum(np.sum(p == y, 1) == 121) / 5000
+            print("epoch {}, loss {:.3g}, acc {:.3g}".format(epoch, L.item(), acc))
+            if epoch > 5000 and acc > best:
+                torch.save({
+                    'epoch': epoch,
+                    'model_state_dict': model.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'loss': L.item(),
+                    'acc': acc
+                }, "checkpoint_{:.3g}.pt".format(acc))
+                best = acc
 
