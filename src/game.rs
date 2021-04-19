@@ -2,7 +2,7 @@ use core::usize;
 
 use crate::{INVALID_POSITION, Position, board::Board};
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum Player { First, Second }
 impl Player {
     fn change(&mut self) {
@@ -61,6 +61,14 @@ impl Game {
     pub fn turn_limit(&self) -> usize { self.board_def.turn_limit() }
     pub fn adj(&self, center: Position) -> &'static [Position] { self.board_def.adj(center) }
     pub fn base_ids(&self) -> (&'static [Position], &'static [Position]) { self.board_def.base_ids()}
+
+    pub fn current_player(&self) -> Player {
+        self.player
+    }
+
+    pub fn get_pieces(&self) -> &[Piece] {
+        &self.pieces
+    }
 
     /// find possible moves of p by BFS. result[i] = j means p can move to i via j. INVALID_POSITION means impossible move.
     pub fn possible_moves_with_path(&self, pos: Position) -> Vec<Position> {

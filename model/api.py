@@ -31,6 +31,9 @@ libcc0.do_move.restype = None
 libcc0.get_status.argtypes = [ctypes.c_void_p]
 libcc0.get_status.restype = ctypes.c_uint8
 
+libcc0.dump.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.POINTER(ctypes.c_uint8)), ctypes.POINTER(ctypes.c_uint64)]
+libcc0.dump.restype = None
+
 class Game:
     def __init__(self, board_type="standard"):
         if board_type == "standard":
@@ -73,3 +76,20 @@ class Game:
     def get_status(self):
         return libcc0.get_status(self.ptr)
 
+    # return (self pieces, opponent pieces)
+    def dump(self):
+        buffer_ptr = ctypes.POINTER(ctypes.c_uint8)()
+        size = ctypes.c_uint64(0)
+        libcc0.dump(self.ptr, ctypes.byref(buffer_ptr), ctypes.byref(size))
+
+        n_pieces = buffer_ptr[0]
+        current_player = buffer_ptr[1]
+        first_players_pieces = [ buffer_ptr[i+2] for i in range(n_pieces) ]
+        second_players_pieces = [ buffer_ptr[i+2+n_pieces] for i in range(n_pieces) ]
+
+        libcc0.free_memory(buffer_ptr, size)
+
+        if current_player == 1:
+            return first_players_pieces, second_players_pieces
+        elif current_player == 2:
+            return second_players_pieces, first_players_pieces

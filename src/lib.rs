@@ -78,4 +78,29 @@ pub unsafe extern fn get_status(game: *mut game::Game) -> u8 {
     }
 }
 
+/// dump game state.
+/// 1st byte: n_pieces
+/// 2nd byte: current player. 1 for the first player, 2 for the second.
+/// following 2*`n_pieces` bytes: the position of each pieces, with the first half belongs to the first player.
+#[no_mangle]
+pub unsafe extern fn dump(game: *mut game::Game, out: *mut *mut Position, length: *mut u64) {
+    let game = &mut *game;
+    let mut encoded = vec![];
 
+    encoded.push(game.n_pieces() as _);
+    encoded.push(match game.current_player() {
+        game::Player::First => 1,
+        game::Player::Second => 2
+    });
+
+    for player in &[game::Player::First, game::Player::Second] {
+        for piece in game.get_pieces() {
+            if &piece.owner == player {
+                encoded.push(piece.position)
+            }
+        }
+    }
+
+    *length = encoded.len() as _;
+    *out = encoded.leak() as *const _ as _;
+}
