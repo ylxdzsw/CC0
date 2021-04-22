@@ -30,7 +30,7 @@ class TransformerClassifier(torch.nn.Module):
         super(TransformerClassifier, self).__init__()
         self.embedding = torch.nn.Embedding(board_size*3, 256)
         encoder_layer = torch.nn.TransformerEncoderLayer(256, nhead=8, dim_feedforward=768)
-        self.encoder = torch.nn.TransformerEncoder(encoder_layer, 8)
+        self.encoder = torch.nn.TransformerEncoder(encoder_layer, 12)
         self.decoder = torch.nn.Linear(256, board_size)
         self.activation = torch.nn.Sigmoid()
 
@@ -68,12 +68,13 @@ def get_batch(dataset, batch_size, start=-1):
 
 model = TransformerClassifier(121).cuda()
 loss = torch.nn.BCELoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=3e-5)
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-5)
 best = .5
 epoch = 0
 
+# a note about training: train shallow (8 layers, 3e-5 learning rate) model first. When it converges, deepen the model and load the parital parameters and continue training with small learing rate
 try:
-    checkpoint = torch.load(sys.argv[1])
+    checkpoint = load(sys.argv[1])
     model.load_state_dict(checkpoint['model_state_dict'])
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     epoch = checkpoint['epoch']
@@ -97,14 +98,13 @@ while epoch < 800000:
             p = model(torch.from_numpy(X).cuda())
             p = (p > .5).cpu().numpy()
             acc = sum(np.sum(p == y, 1) == 121) / 5000
-            print("epoch {}, loss {:.3g}, acc {:.3g}".format(epoch, L.item(), acc))
-            if epoch > 5000 and acc > best:
-                torch.save({
+            print("epoch {}, loss {:#.3g}, acc {:#.3g}".format(epoch, L.item(), acc))
+            if acc > best:
+                save({
                     'epoch': epoch,
                     'model_state_dict': model.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                     'loss': L.item(),
                     'acc': acc
-                }, "checkpoint_{:.3g}.pt".format(acc))
+                }, "checkpoint_{:#.3g}".format(acc))
                 best = acc
-
