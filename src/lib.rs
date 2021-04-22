@@ -7,9 +7,9 @@ type Position = u8; // huge board (rank 6) have 253 slots, u8 is just perfect.
 #[no_mangle]
 pub static INVALID_POSITION: Position = Position::MAX;
 
-mod board;
-mod game;
-mod mcts;
+pub mod board;
+pub mod game;
+pub mod mcts;
 
 #[no_mangle]
 pub unsafe extern fn alloc_memory(byte_size: u64) -> *mut u8 {

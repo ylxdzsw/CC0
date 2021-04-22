@@ -69,7 +69,7 @@ def get_batch(dataset, batch_size, start=-1):
 model = TransformerClassifier(121).cuda()
 loss = torch.nn.BCELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-5)
-best = .5
+best = .1
 epoch = 0
 
 # a note about training: train shallow (8 layers, 3e-5 learning rate) model first. When it converges, deepen the model and load the parital parameters and continue training with small learing rate
@@ -108,3 +108,4 @@ while epoch < 800000:
                     'acc': acc
                 }, "checkpoint_{:#.3g}".format(acc))
                 best = acc
+                # torch.jit.script(model).save("scripted_model")
