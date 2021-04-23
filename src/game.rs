@@ -1,18 +1,33 @@
-use core::usize;
+use alloc::vec::Vec;
 
 use crate::{INVALID_POSITION, Position, board::Board};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum Player { First, Second }
 impl Player {
-    fn change(&mut self) {
+    pub fn change(&mut self) {
         match *self {
             Player::First => *self = Player::Second,
             Player::Second => *self = Player::First
         }
     }
+
+    pub fn the_other(&self) -> Self {
+        match *self {
+            Player::First => Player::Second,
+            Player::Second => Player::First
+        }
+    }
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum Status { Winner(Player), Tie, Unfinished }
+
+impl Status {
+    pub fn finished(&self) -> bool { *self != Status::Unfinished }
+}
+
+#[derive(Debug, Clone)]
 pub struct Piece {
     pub owner: Player,
     pub position: Position
@@ -24,11 +39,12 @@ impl Piece {
     }
 }
 
+#[derive(Clone)]
 pub struct Game {
     board_def: &'static dyn Board,
     pieces: Vec<Piece>,
     pindex: Vec<Option<usize>>, // position -> piece index
-    player: Player, // current player. the First player plays first.
+    player: Player, // the player that will play next. the First player plays first.
     total_moves: usize
 }
 
@@ -62,8 +78,12 @@ impl Game {
     pub fn adj(&self, center: Position) -> &'static [Position] { self.board_def.adj(center) }
     pub fn base_ids(&self) -> (&'static [Position], &'static [Position]) { self.board_def.base_ids()}
 
-    pub fn current_player(&self) -> Player {
+    pub fn next_player(&self) -> Player {
         self.player
+    }
+
+    pub fn last_player(&self) -> Player {
+        self.player.the_other()
     }
 
     pub fn get_pieces(&self) -> &[Piece] {
@@ -149,20 +169,26 @@ impl Game {
         self.pindex[to as usize] = Some(pid);
     }
 
-    pub fn finished(&self) -> bool {
-        let (w1, w2) = self.score();
-        w1 == self.board_def.n_pieces() || w2 == self.board_def.n_pieces() || self.total_moves >= 2 * self.board_def.turn_limit()
-    }
-
-    // evaluate the pieces that are in the opponents base
-    pub fn score(&self) -> (usize, usize) {
+    pub fn status(&self) -> Status {
         let mut w1 = 0;
         let mut w2 = 0;
         for p in &self.pieces {
             if p.owner == Player::First && self.board_def.base_ids().1.contains(&p.position) { w1 += 1; }
             if p.owner == Player::Second && self.board_def.base_ids().0.contains(&p.position) { w2 += 1; }
         }
-        (w1, w2)
+        if w1 == self.board_def.n_pieces() {
+            Status::Winner(Player::First)
+        } else if w2 == self.board_def.n_pieces() {
+            Status::Winner(Player::Second)
+        } else if self.total_moves >= 2 * self.board_def.turn_limit() {
+            match w1.cmp(&w2) {
+                core::cmp::Ordering::Less => Status::Winner(Player::Second),
+                core::cmp::Ordering::Equal => Status::Tie,
+                core::cmp::Ordering::Greater => Status::Winner(Player::First)
+            }
+        } else {
+            Status::Unfinished
+        }
     }
 }
 

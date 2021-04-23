@@ -5,7 +5,10 @@ authors = ["Shiwei Zhang <ylxdzsw@gmail.com>"]
 edition = "2018"
 
 [lib]
-crate-type = ["lib", "cdylib"]
+crate-type = ["cdylib"]
+
+[dependencies]
+ordered-float = { version = "2.1", default-features = false }
 
 [target.'cfg(target_arch="wasm32")'.dependencies]
 wee_alloc = "0.4"

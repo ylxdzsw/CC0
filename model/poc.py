@@ -108,4 +108,4 @@ while epoch < 800000:
                     'acc': acc
                 }, "checkpoint_{:#.3g}".format(acc))
                 best = acc
-                # torch.jit.script(model).save("scripted_model")
+                torch.jit.script(model).save("scripted_model")

@@ -1,3 +1,12 @@
+// the calculation of sqrt needs std
+// #![no_std]
+
+#[macro_use]
+extern crate alloc;
+
+use alloc::vec::Vec;
+use alloc::boxed::Box;
+
 #[cfg(target_arch="wasm32")]
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
@@ -65,16 +74,11 @@ pub unsafe extern fn do_move(game: *mut game::Game, from: Position, to: Position
 /// 1: first player won, 2: second player won, 3: tie, 0: unfinished.
 #[no_mangle]
 pub unsafe extern fn get_status(game: *mut game::Game) -> u8 {
-    let game = &mut *game;
-    if game.finished() {
-        let (w1, w2) = game.score();
-        match w1.cmp(&w2) {
-            std::cmp::Ordering::Greater => 1,
-            std::cmp::Ordering::Less => 2,
-            std::cmp::Ordering::Equal => 3,
-        }
-    } else {
-        0
+    match (*game).status() {
+        game::Status::Winner(game::Player::First) => 1,
+        game::Status::Winner(game::Player::Second) => 2,
+        game::Status::Tie => 3,
+        game::Status::Unfinished => 0
     }
 }
 
@@ -88,7 +92,7 @@ pub unsafe extern fn dump(game: *mut game::Game, out: *mut *mut Position, length
     let mut encoded = vec![];
 
     encoded.push(game.n_pieces() as _);
-    encoded.push(match game.current_player() {
+    encoded.push(match game.next_player() {
         game::Player::First => 1,
         game::Player::Second => 2
     });
