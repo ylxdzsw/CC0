@@ -20,5 +20,5 @@ class Environment(Game):
 
         self.do_move(pos, move)
 
-    def replay(self, record):
+    def replay(self, records):
         pass

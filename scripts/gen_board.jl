@@ -1,4 +1,5 @@
 using OhMyJulia
+using Fire
 
 # x axis goes from the lower left corner to the horizonal right, starts from 0
 # y axis goes from the lower left corner to the upper right, starts from 0
@@ -10,7 +11,7 @@ end
 
 Node(x::Int, y::Int) = Node(nothing, x, y)
 
-cartesian(node::Node) = (node.x + cos(π/3) * node.y, sin(π/3) * node.y)
+cartesian(node::Node) = (round(node.x + cos(π/3) * node.y, digits=5), round(sin(π/3) * node.y, digits=5))
 
 # generate the nodes and they positions
 function gen_nodes(rank=4)
@@ -41,7 +42,7 @@ end
 
 # label the nodes from top to bottom using cartesian axis
 function label!(nodes::Vector{Node})
-    nodes = sort(nodes, by=reverse ∘ cartesian)
+    sort!(nodes, by=reverse ∘ cartesian)
     for (i, n) in enumerate(nodes)
         n.id = i-1
     end
@@ -104,4 +105,30 @@ function gen_base_ids(nodes, rank)
     self_base_ids = sort([node.id for node in nodes])[1:sum(1:rank)]
     oppo_base_ids = reverse(reverse(sort([node.id for node in nodes]))[1:sum(1:rank)])
     self_base_ids, oppo_base_ids
+end
+
+@main function rust(rank::Int)
+
+end
+
+# recenter in (100, 100) and make y axis from top to down
+function svg_cartesian(positions)
+    left_most = minimum(car.(positions))
+    right_most = maximum(car.(positions))
+    bottom = minimum(cadr.(positions))
+    top = maximum(cadr.(positions))
+
+    map(positions) do pos
+        x, y = pos
+        x = (x - left_most) / (right_most - left_most)
+        y = 1 - (y - bottom) / (top - bottom)
+        round(100x, digits=2), round(100y, digits=2)
+    end
+end
+
+@main function web(rank::Int)
+    nodes = gen_nodes(rank)
+    label!(nodes)
+    println(collect(gen_base_ids(nodes, rank)))
+    println(collect.(svg_cartesian(cartesian.(nodes))))
 end

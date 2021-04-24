@@ -178,6 +178,8 @@ impl Tree {
     }
 
     // Choose a subtree and step into next state.
+    // This is used in self-play to reuse the searched subtree.
+    // note that in evaluation we should create new trees as the subtree is search assuming the opponent uses the same strategy.
     fn chroot(&mut self, action: (Position, Position)) {
         let pos = self.root.children.iter().position(|n| n.action == action).expect("cannot find the action in root children");
         let child = self.root.children.swap_remove(pos);

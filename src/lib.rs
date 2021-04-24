@@ -7,10 +7,6 @@ extern crate alloc;
 use alloc::vec::Vec;
 use alloc::boxed::Box;
 
-#[cfg(target_arch="wasm32")]
-#[global_allocator]
-static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
-
 type Position = u8; // huge board (rank 6) have 253 slots, u8 is just perfect.
 
 #[no_mangle]
