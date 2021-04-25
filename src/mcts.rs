@@ -70,7 +70,8 @@ impl Node {
                         let (pick_p, move_p, value) = policy(game); // the game's next player is the other player (not the node's player). The value returned by the NN is about the game state, which describe how likely the next player can win.
                         self.expand(game, &pick_p, &move_p);
                         -value
-                    } else { // pure mcts, using random rollout until end to estimate value
+                    } else { // pure mcts, uniformly expand and use random rollout until end to estimate value
+                        self.expand_uniform(game);
                         self.rollout(game)
                     }
                 }
@@ -107,6 +108,8 @@ impl Node {
         self.q += (leaf_value - self.q) / self.n_visits as f64
     }
 
+    /// pick_p is a list similar to game.pieces. Unmovable pieces and the pieces of the opponenets shoule have be 0.
+    /// move_p is an array of (2 * n_pieces) * board_size. Eachline is the probabilities of moving targets. Illegle moves should have 0.
     fn expand(&mut self, game: &Game, pick_p: &[f64], move_p: &[f64]) {
         let pieces = game.get_pieces();
         let board_size = game.board_size();
@@ -125,6 +128,24 @@ impl Node {
                 let action = (from as _, to as _);
                 let prior = pick_p[piece_id] * move_p[piece_id * board_size + to];
                 self.children.push(Node::new(action, self.player.the_other(), prior))
+            }
+        }
+    }
+
+    fn expand_uniform(&mut self, game: &Game) {
+        let pieces = game.get_pieces();
+        let board_size = game.board_size();
+
+        let all_valid_moves: Vec<_> = game.all_pieces_and_possible_moves_of_current_player().into_iter()
+                .filter(|(_, moves)| !moves.is_empty())
+                .collect();
+
+        let n_movable_pieces = all_valid_moves.len();
+
+        for (from, moves) in all_valid_moves {
+            let n_targets = moves.len();
+            for to in moves {
+                self.children.push(Node::new((from, to), self.player.the_other(), 1. / n_targets as f64 / n_movable_pieces as f64))
             }
         }
     }
@@ -160,14 +181,14 @@ impl Tree {
         Self { root: Node::new((INVALID_POSITION, INVALID_POSITION), Player::First, 1.), policy }
     }
 
-    fn playout(&mut self, game: &Game, ntimes: usize) {
+    pub fn playout(&mut self, game: &Game, ntimes: usize) {
         self.root.player = game.last_player(); // the children of root will be the one play next
         for n in 0..ntimes {
             self.root.playout_and_update_recursive(&mut game.clone(), self.policy.as_deref());
         }
     }
 
-    fn get_move_probs(&self, temp: f64) -> Vec<(Position, Position, f64)> { // from, to, prob
+    pub fn get_move_probs(&self, temp: f64) -> Vec<(Position, Position, f64)> { // from, to, prob
         debug_assert!(!self.root.children.is_empty());
         let mut visits: Vec<f64> = self.root.children.iter().map(|node| node.n_visits as _).collect();
         for v in visits.iter_mut() {
@@ -180,18 +201,18 @@ impl Tree {
     // Choose a subtree and step into next state.
     // This is used in self-play to reuse the searched subtree.
     // note that in evaluation we should create new trees as the subtree is search assuming the opponent uses the same strategy.
-    fn chroot(&mut self, action: (Position, Position)) {
+    pub fn chroot(&mut self, action: (Position, Position)) {
         let pos = self.root.children.iter().position(|n| n.action == action).expect("cannot find the action in root children");
         let child = self.root.children.swap_remove(pos);
         self.root = child;
     }
 
-    pub fn get_action(&mut self, game: &Game, n_playout: usize, exploration: bool) -> (Position, Position) {
-        const temp: f64 = 1e-3;
-        const exploration_prob: f32 = 0.2;
-        self.playout(game, n_playout);
-        let acts = self.get_move_probs(temp);
-        let sampled_act = if exploration && get_random_float() < exploration_prob {
+    // sample an action using the root visit counts.
+    // exploration_prob: 0 in inference, 0.1 in self-play
+    // temperature: 1e-3 in inference, 0.1 in self-play
+    pub fn sample_action(&mut self, game: &Game, exploration_prob: f32, temperature: f64) -> (Position, Position) {
+        let acts = self.get_move_probs(temperature);
+        let sampled_act = if get_random_float() < exploration_prob {
             uniform_random_choice(&acts)
         } else {
             let sampled_index = sample_categorical(acts.iter().map(|(_, _, p)| *p));
@@ -212,5 +233,38 @@ mod tests {
         for (a, b) in x.iter().zip([0.02364, 0.06426, 0.17468, 0.47483, 0.02364, 0.06426, 0.17468].iter()) {
             assert!((a - b).abs() < 1e-5)
         }
+    }
+
+    #[test] #[ignore]
+    fn test_mcts_playout() {
+        let start_time = std::time::Instant::now();
+        let mut mcts = Tree::new(None);
+        let mut game = Game::new(&crate::board::STANDARD_BOARD);
+        let mut total_playout = 0;
+
+        loop {
+            let n_playout = 2000 - mcts.root.n_visits;
+            mcts.playout(&game, n_playout as _);
+            total_playout += n_playout;
+            let (from, to) = mcts.sample_action(&game, 0., 1e-3);
+            println!("{:?} move {} to {}", game.next_player(), from, to);
+            game.move_with_role_change(from, to);
+            match game.status() {
+                Status::Winner(winner) => {
+                    println!("{:?} won!", winner);
+                    break
+                }
+                Status::Tie => {
+                    println!("tie!");
+                    break
+                }
+                Status::Unfinished => {}
+            }
+            // mcts.chroot((from, to));
+            mcts = Tree::new(None);
+        }
+
+        let elapsed_time = start_time.elapsed().as_millis();
+        println!("total playout: {}, elasped: {}, playout/ms: {}", total_playout, elapsed_time, total_playout as f64 / elapsed_time as f64)
     }
 }

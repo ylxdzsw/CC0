@@ -12,17 +12,37 @@ canvas =
                 .stroke 'black'
                 .remember 'id', i
 
+    move_no_trace: (old_pos, new_pos) ->
+        color = @slots[old_pos].remember 'color'
+        @slots[old_pos]
+            .fill 'transparent'
+            .forget 'color'
+        @slots[new_pos]
+            .fill color
+            .remember 'color', color
+
     reset: ->
         [self_slots, oppo_slots] = @board.base_ids
         for slot in @slots
             switch
                 when slot.remember('id') in self_slots
                     slot.fill 'blue'
+                    slot.remember 'color', 'blue'
                 when slot.remember('id') in oppo_slots
                     slot.fill 'red'
+                    slot.remember 'color', 'red'
                 else
                     slot.fill 'transparent'
 
+window.replay = (records) ->
+    button = document.createElement 'button'
+    button.innerHTML = 'next'
+    button.addEventListener 'click', ->
+        [old_pos, new_pos] = do records.shift
+        canvas.move_no_trace old_pos, new_pos
+
+    document.querySelector 'body'
+        .appendChild button
 
 main = (ready) ->
     await ready
