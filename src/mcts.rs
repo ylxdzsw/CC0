@@ -94,11 +94,12 @@ impl Node {
 
     fn select_chlid(&mut self) -> &mut Node {
         let pvisit = self.n_visits;
-        self.children.iter_mut().max_by_key(|x| OrderedFloat(x.value(pvisit))).expect("selecting from no children")
+        self.children.iter_mut().max_by_key(|x| OrderedFloat(x.puct(pvisit))).expect("selecting from no children")
     }
 
-    fn value(&self, pvisit: u64) -> f64 {
-        const c_puct: f64 = 5.;
+    // unlike UCB in most MCTS, AlphaZero uses a variant called PUCT.
+    fn puct(&self, pvisit: u64) -> f64 {
+        const c_puct: f64 = 4.; // unlike c in UCB which takes 1.4, c_puct usually set around 4 or 5.
         let u = c_puct * self.p * (pvisit as f64).sqrt() / (1. + self.n_visits as f64);
         self.q + u
     }
@@ -133,12 +134,9 @@ impl Node {
     }
 
     fn expand_uniform(&mut self, game: &Game) {
-        let pieces = game.get_pieces();
-        let board_size = game.board_size();
-
         let all_valid_moves: Vec<_> = game.all_pieces_and_possible_moves_of_current_player().into_iter()
-                .filter(|(_, moves)| !moves.is_empty())
-                .collect();
+            .filter(|(_, moves)| !moves.is_empty())
+            .collect();
 
         let n_movable_pieces = all_valid_moves.len();
 
@@ -212,6 +210,7 @@ impl Tree {
     // temperature: 1e-3 in inference, 0.1 in self-play
     pub fn sample_action(&mut self, game: &Game, exploration_prob: f32, temperature: f64) -> (Position, Position) {
         let acts = self.get_move_probs(temperature);
+        // I don't understand why the paper introduces the Dirichlet distribution. It seems to me that it is quivalent to the following implementation.
         let sampled_act = if get_random_float() < exploration_prob {
             uniform_random_choice(&acts)
         } else {
@@ -260,8 +259,8 @@ mod tests {
                 }
                 Status::Unfinished => {}
             }
-            // mcts.chroot((from, to));
-            mcts = Tree::new(None);
+            mcts.chroot((from, to));
+            // mcts = Tree::new(None);
         }
 
         let elapsed_time = start_time.elapsed().as_millis();
