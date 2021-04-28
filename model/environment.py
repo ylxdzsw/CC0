@@ -12,10 +12,9 @@ class Environment(Game):
 
     def random_move(self):
         possible_moves = self.get_possible_moves()
-        moveable = [ (pos, moves) for pos, moves in possible_moves if len(moves) != 0 ]
-        assert len(moveable) > 0
+        assert len(possible_moves) > 0
 
-        pos, moves = moveable[np.random.randint(len(moveable))]
+        pos, moves = possible_moves[np.random.randint(len(possible_moves))]
         move = moves[np.random.randint(len(moves))]
 
         self.do_move(pos, move)

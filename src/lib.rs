@@ -49,7 +49,7 @@ pub unsafe extern fn get_n_pieces(game: *mut game::Game) -> u64 {
 /// returned list is encoded as [INVALID_POSITION, pieces_pos_1, pieces_move_1, pieces_move_2, INVALID_POSITION, pieces_pos_1, ...]
 #[no_mangle]
 pub unsafe extern fn get_possible_moves(game: *mut game::Game, out: *mut *mut Position, length: *mut u64) {
-    let possible_moves = (*game).all_pieces_and_possible_moves_of_current_player();
+    let possible_moves = (*game).movable_pieces_and_possible_moves_of_current_player();
 
     let mut encoded = vec![];
     for (piece_pos, mut moves) in possible_moves {

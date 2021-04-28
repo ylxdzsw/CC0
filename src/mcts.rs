@@ -99,7 +99,8 @@ impl Node {
 
     // unlike UCB in most MCTS, AlphaZero uses a variant called PUCT.
     fn puct(&self, pvisit: u64) -> f64 {
-        const c_puct: f64 = 4.; // unlike c in UCB which takes 1.4, c_puct usually set around 4 or 5.
+        #[allow(non_upper_case_globals)]
+        const c_puct: f64 = 2.;
         let u = c_puct * self.p * (pvisit as f64).sqrt() / (1. + self.n_visits as f64);
         self.q + u
     }
@@ -109,8 +110,8 @@ impl Node {
         self.q += (leaf_value - self.q) / self.n_visits as f64
     }
 
-    /// pick_p is a list similar to game.pieces. Unmovable pieces and the pieces of the opponenets shoule have be 0.
-    /// move_p is an array of (2 * n_pieces) * board_size. Eachline is the probabilities of moving targets. Illegle moves should have 0.
+    /// pick_p is a list similar to game.pieces. It should be normalized with illegal choices having 0 probabilities.
+    /// move_p is an array of (2 * n_pieces) * board_size. Eachline is the probabilities of moving targets. It should be normalized with illegal moves having 0 probabilities.
     fn expand(&mut self, game: &Game, pick_p: &[f64], move_p: &[f64]) {
         let pieces = game.get_pieces();
         let board_size = game.board_size();
@@ -134,25 +135,20 @@ impl Node {
     }
 
     fn expand_uniform(&mut self, game: &Game) {
-        let all_valid_moves: Vec<_> = game.all_pieces_and_possible_moves_of_current_player().into_iter()
-            .filter(|(_, moves)| !moves.is_empty())
-            .collect();
-
-        let n_movable_pieces = all_valid_moves.len();
+        let all_valid_moves = game.movable_pieces_and_possible_moves_of_current_player();
+        let n_valid_pieces = all_valid_moves.len() as f64;
 
         for (from, moves) in all_valid_moves {
             let n_targets = moves.len();
             for to in moves {
-                self.children.push(Node::new((from, to), self.player.the_other(), 1. / n_targets as f64 / n_movable_pieces as f64))
+                self.children.push(Node::new((from, to), self.player.the_other(), 1. / n_targets as f64 / n_valid_pieces))
             }
         }
     }
 
     fn rollout(&self, game: &mut Game) -> f64 {
         while !game.status().finished() {
-            let all_valid_moves: Vec<_> = game.all_pieces_and_possible_moves_of_current_player().into_iter()
-                .filter(|(_, moves)| !moves.is_empty())
-                .collect();
+            let all_valid_moves = game.movable_pieces_and_possible_moves_of_current_player();
             let (from, moves) = uniform_random_choice(&all_valid_moves);
             let to = uniform_random_choice(moves);
             game.move_with_role_change(*from, *to);
@@ -181,7 +177,7 @@ impl Tree {
 
     pub fn playout(&mut self, game: &Game, ntimes: usize) {
         self.root.player = game.last_player(); // the children of root will be the one play next
-        for n in 0..ntimes {
+        for _ in 0..ntimes {
             self.root.playout_and_update_recursive(&mut game.clone(), self.policy.as_deref());
         }
     }
@@ -208,7 +204,7 @@ impl Tree {
     // sample an action using the root visit counts.
     // exploration_prob: 0 in inference, 0.1 in self-play
     // temperature: 1e-3 in inference, 0.1 in self-play
-    pub fn sample_action(&mut self, game: &Game, exploration_prob: f32, temperature: f64) -> (Position, Position) {
+    pub fn sample_action(&mut self, exploration_prob: f32, temperature: f64) -> (Position, Position) {
         let acts = self.get_move_probs(temperature);
         // I don't understand why the paper introduces the Dirichlet distribution. It seems to me that it is quivalent to the following implementation.
         let sampled_act = if get_random_float() < exploration_prob {
@@ -218,6 +214,10 @@ impl Tree {
             &acts[sampled_index]
         };
         (sampled_act.0, sampled_act.1)
+    }
+
+    pub fn total_visits(&self) -> u64 {
+        return self.root.n_visits
     }
 }
 
@@ -232,38 +232,5 @@ mod tests {
         for (a, b) in x.iter().zip([0.02364, 0.06426, 0.17468, 0.47483, 0.02364, 0.06426, 0.17468].iter()) {
             assert!((a - b).abs() < 1e-5)
         }
-    }
-
-    #[test] #[ignore]
-    fn test_mcts_playout() {
-        let start_time = std::time::Instant::now();
-        let mut mcts = Tree::new(None);
-        let mut game = Game::new(&crate::board::STANDARD_BOARD);
-        let mut total_playout = 0;
-
-        loop {
-            let n_playout = 2000 - mcts.root.n_visits;
-            mcts.playout(&game, n_playout as _);
-            total_playout += n_playout;
-            let (from, to) = mcts.sample_action(&game, 0., 1e-3);
-            println!("{:?} move {} to {}", game.next_player(), from, to);
-            game.move_with_role_change(from, to);
-            match game.status() {
-                Status::Winner(winner) => {
-                    println!("{:?} won!", winner);
-                    break
-                }
-                Status::Tie => {
-                    println!("tie!");
-                    break
-                }
-                Status::Unfinished => {}
-            }
-            mcts.chroot((from, to));
-            // mcts = Tree::new(None);
-        }
-
-        let elapsed_time = start_time.elapsed().as_millis();
-        println!("total playout: {}, elasped: {}, playout/ms: {}", total_playout, elapsed_time, total_playout as f64 / elapsed_time as f64)
     }
 }

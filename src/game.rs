@@ -148,11 +148,11 @@ impl Game {
             .collect()
     }
 
-    pub fn all_pieces_and_possible_moves_of_current_player(&self) -> Vec<(Position, Vec<Position>)> {
+    pub fn movable_pieces_and_possible_moves_of_current_player(&self) -> Vec<(Position, Vec<Position>)> {
         self.pieces.iter()
             .filter(|p| p.owner == self.player)
-            .map(|p| p.position)
-            .map(|pos| (pos, self.possible_moves(pos)))
+            .map(|p| (p.position, self.possible_moves(p.position)))
+            .filter(|(_, moves)| !moves.is_empty())
             .collect()
     }
 

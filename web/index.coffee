@@ -46,7 +46,7 @@ window.replay = (records) ->
 
 main = (ready) ->
     await ready
-    canvas.init StandardBoard
+    canvas.init SmallBoard
 
     do canvas.reset
 
