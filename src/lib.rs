@@ -1,4 +1,4 @@
-// the calculation of sqrt needs std
+// float point math (sqrt, ln) needs std
 // #![no_std]
 
 #[macro_use]
@@ -8,6 +8,15 @@ use alloc::vec::Vec;
 use alloc::boxed::Box;
 
 type Position = u8; // huge board (rank 6) have 253 slots, u8 is just perfect.
+type EncodedAction = u64;
+
+fn encode_action(from: Position, to: Position) -> EncodedAction {
+    ((from as EncodedAction) << 8) + (to as EncodedAction)
+}
+
+fn decode_action(encoded_action: EncodedAction) -> (Position, Position) {
+    ((encoded_action >> 8) as _, encoded_action as _)
+}
 
 #[no_mangle]
 pub static INVALID_POSITION: Position = Position::MAX;
@@ -48,7 +57,7 @@ pub unsafe extern fn get_n_pieces(game: *mut game::Game) -> u64 {
 
 /// returned list is encoded as [INVALID_POSITION, pieces_pos_1, pieces_move_1, pieces_move_2, INVALID_POSITION, pieces_pos_1, ...]
 #[no_mangle]
-pub unsafe extern fn get_possible_moves(game: *mut game::Game, out: *mut *mut Position, length: *mut u64) {
+pub unsafe extern fn all_possible_moves(game: *mut game::Game, out: *mut *mut Position, length: *mut u64) {
     let possible_moves = (*game).movable_pieces_and_possible_moves_of_current_player();
 
     let mut encoded = vec![];
@@ -103,4 +112,40 @@ pub unsafe extern fn dump(game: *mut game::Game, out: *mut *mut Position, length
 
     *length = encoded.len() as _;
     *out = encoded.leak() as *const _ as _;
+}
+
+#[no_mangle]
+pub unsafe extern fn new_mcts(policy_cfun: extern fn (*mut game::Game, *mut f64, *mut f64, *mut f64)) -> *mut mcts::Tree {
+    let policy = Box::new(move |game: &game::Game| {
+        let mut pick_p = vec![0.0; game.n_pieces()];
+        let mut move_p = vec![0.0; game.n_pieces() * game.board_size()];
+        let mut value = 0.0;
+
+        policy_cfun(game as *const _ as _, pick_p.as_mut_ptr(), move_p.as_mut_ptr(), &mut value as _);
+
+        (pick_p, move_p, value)
+    });
+    Box::leak(Box::new(mcts::Tree::new(Some(policy))))
+}
+
+#[no_mangle]
+pub unsafe extern fn mcts_playout(mcts: *mut mcts::Tree, game: *mut game::Game, ntimes: u64) {
+    (*mcts).playout(&*game, ntimes as _)
+}
+
+#[no_mangle]
+pub unsafe extern fn mcts_sample_action(mcts: *mut mcts::Tree, exploration_prob: f64, temperature: f64) -> EncodedAction {
+    let (from, to) = (*mcts).sample_action(exploration_prob, temperature);
+    encode_action(from, to)
+}
+
+#[no_mangle]
+pub unsafe extern fn mcts_chroot(mcts: *mut mcts::Tree, encoded_action: EncodedAction) {
+    let action = decode_action(encoded_action);
+    (*mcts).chroot(action)
+}
+
+#[no_mangle]
+pub unsafe extern fn mcts_total_visits(mcts: *mut mcts::Tree) -> u64 {
+    (*mcts).total_visits()
 }

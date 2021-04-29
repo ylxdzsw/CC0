@@ -4,7 +4,7 @@ import torch
 import numpy as np
 import sys
 from utils import save, load, normalize
-from environment import Environment
+from api import Game
 
 try:
     data = load("data")
@@ -12,15 +12,20 @@ except:
     data = []
 
     while len(data) < 2000000:
-        env = Environment()
+        game = Game()
         for i in range(200):
-            env.random_move()
+            possible_moves = game.all_possible_moves()
+            assert len(possible_moves) > 0
+
             if i > 50: # only starts from there
-                possible_moves = env.get_possible_moves()
                 p = normalize([len(moves) for pos, moves in possible_moves]) # prefer pieces that have more possible moves
                 i = np.random.choice(range(len(possible_moves)), p=p)
-                self_pieces, oppo_pieces = env.dump()
+                self_pieces, oppo_pieces = game.dump()
                 data.append((self_pieces, oppo_pieces, possible_moves[i][0], possible_moves[i][1]))
+
+            pos, moves = possible_moves[np.random.randint(len(possible_moves))]
+            move = moves[np.random.randint(len(moves))]
+            game.do_move(pos, move)
 
     save(data, "data")
 

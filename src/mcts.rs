@@ -13,8 +13,8 @@ fn get_random_number() -> u32 {
     }
 }
 
-fn get_random_float() -> f32 {
-    get_random_number() as f32 / core::u32::MAX as f32
+fn get_random_float() -> f64 {
+    get_random_number() as f64 / core::u32::MAX as f64
 }
 
 fn sample_categorical(probs: impl Iterator<Item=f64>) -> usize {
@@ -23,7 +23,7 @@ fn sample_categorical(probs: impl Iterator<Item=f64>) -> usize {
         if rand < p as _ {
             return i
         } else {
-            rand -= p as f32;
+            rand -= p;
         }
     }
     unreachable!()
@@ -163,7 +163,7 @@ impl Node {
     }
 }
 
-type PolicyCallback = dyn Fn(&Game) -> (Vec<f64>, Vec<f64>, f64);
+pub type PolicyCallback = dyn Fn(&Game) -> (Vec<f64>, Vec<f64>, f64);
 
 pub struct Tree {
     root: Node,
@@ -204,7 +204,7 @@ impl Tree {
     // sample an action using the root visit counts.
     // exploration_prob: 0 in inference, 0.1 in self-play
     // temperature: 1e-3 in inference, 0.1 in self-play
-    pub fn sample_action(&mut self, exploration_prob: f32, temperature: f64) -> (Position, Position) {
+    pub fn sample_action(&mut self, exploration_prob: f64, temperature: f64) -> (Position, Position) {
         let acts = self.get_move_probs(temperature);
         // I don't understand why the paper introduces the Dirichlet distribution. It seems to me that it is quivalent to the following implementation.
         let sampled_act = if get_random_float() < exploration_prob {

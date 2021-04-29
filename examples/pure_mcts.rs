@@ -7,7 +7,7 @@ fn main() {
     let mut total_playout = 0;
 
     loop {
-        let n_playout = 5000 - mcts.total_visits();
+        let n_playout = 20000 - mcts.total_visits();
         mcts.playout(&game, n_playout as _);
         total_playout += n_playout;
         let (from, to) = mcts.sample_action(0., 1e-3);
