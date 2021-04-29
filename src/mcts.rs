@@ -40,10 +40,14 @@ fn softmax(x: &mut [f64], temp: f64) {
     x.iter_mut().for_each(|v| *v = (*v - m - s.ln()).exp());
 }
 
+pub type Action = (Position, Position); // from, to
+pub type ActionProb = (Position, Position, f64); // from, to, prob
+pub type PolicyValueCallback = dyn Fn(&Game) -> (Vec<ActionProb>, f64);
+
 // A parent node holds the ownership of it children. For simplicity and unsafe-free, the child node do not hold
 // reference to its parent. Therefore the traveling methods must be recursive and save the path on stack.
 struct Node {
-    action: (Position, Position),
+    action: Action,
     player: Player, // who plays the action
     children: Vec<Node>,
     n_visits: u64,
@@ -52,13 +56,13 @@ struct Node {
 }
 
 impl Node {
-    fn new(action: (Position, Position), player: Player, p: f64) -> Self {
+    fn new(action: Action, player: Player, p: f64) -> Self {
         Self { action, player, children: vec![], n_visits: 0, q: 0., p }
     }
 
     /// playout a game and update the path, return the leaf_value for the parent
     // Note about leaf_value: the leaf_value applied to a node should be large if the action of the node is favorable for the last player (it is the `player` of the node)
-    fn playout_and_update_recursive(&mut self, game: &mut Game, policy: Option<&PolicyCallback>) -> f64 {
+    fn playout_and_update_recursive(&mut self, game: &mut Game, policy: Option<&PolicyValueCallback>) -> f64 {
         if self.is_leaf() {
             let leaf_value = match game.status() {
                 Status::Winner(winner) => {
@@ -67,8 +71,8 @@ impl Node {
                 Status::Tie => 0.,
                 Status::Unfinished => {
                     if let Some(policy) = policy { // use policy value to estimate
-                        let (pick_p, move_p, value) = policy(game); // the game's next player is the other player (not the node's player). The value returned by the NN is about the game state, which describe how likely the next player can win.
-                        self.expand(game, &pick_p, &move_p);
+                        let (action_probs, value) = policy(game); // the game's next player is the other player (not the node's player). The value returned by the NN is about the game state, which describe how likely the next player can win.
+                        self.expand(game, &action_probs);
                         -value
                     } else { // pure mcts, uniformly expand and use random rollout until end to estimate value
                         self.expand_uniform(game);
@@ -110,39 +114,22 @@ impl Node {
         self.q += (leaf_value - self.q) / self.n_visits as f64
     }
 
-    /// pick_p is a list similar to game.pieces. It should be normalized with illegal choices having 0 probabilities.
-    /// move_p is an array of (2 * n_pieces) * board_size. Eachline is the probabilities of moving targets. It should be normalized with illegal moves in each line having 0 probabilities. However, the lines that corresponding pick_p is 0 are not accessed and can have arbitrary value.
-    fn expand(&mut self, game: &Game, pick_p: &[f64], move_p: &[f64]) {
-        let pieces = game.get_pieces();
-        let board_size = game.board_size();
-
-        for piece_id in 0..2*game.n_pieces() {
-            if pick_p[piece_id] <= f64::EPSILON {
-                continue
-            }
-
-            let from = pieces[piece_id].position;
-            for to in 0..board_size {
-                if move_p[piece_id * board_size + to] <= f64::EPSILON {
-                    continue
-                }
-
-                let action = (from as _, to as _);
-                let prior = pick_p[piece_id] * move_p[piece_id * board_size + to];
-                self.children.push(Node::new(action, self.player.the_other(), prior))
-            }
+    fn expand(&mut self, game: &Game, action_probs: &[ActionProb]) {
+        for &(from, to, p) in action_probs {
+            self.children.push(Node::new((from, to), game.next_player(), p))
         }
     }
 
     fn expand_uniform(&mut self, game: &Game) {
-        let all_valid_moves = game.movable_pieces_and_possible_moves_of_current_player();
-        let n_valid_pieces = all_valid_moves.len() as f64;
-
-        for (from, moves) in all_valid_moves {
-            let n_targets = moves.len();
+        for (from, moves) in game.movable_pieces_and_possible_moves_of_current_player() {
             for to in moves {
-                self.children.push(Node::new((from, to), self.player.the_other(), 1. / n_targets as f64 / n_valid_pieces))
+                self.children.push(Node::new((from, to), game.next_player(), 0.))
             }
+        }
+
+        let p = 1. / self.children.len() as f64;
+        for child in self.children.iter_mut() {
+            child.p = p
         }
     }
 
@@ -163,15 +150,13 @@ impl Node {
     }
 }
 
-pub type PolicyCallback = dyn Fn(&Game) -> (Vec<f64>, Vec<f64>, f64);
-
 pub struct Tree {
     root: Node,
-    policy: Option<Box<PolicyCallback>> // pick p, move p, value
+    policy: Option<Box<PolicyValueCallback>> // pick p, move p, value
 }
 
 impl Tree {
-    pub fn new(policy: Option<Box<PolicyCallback>>) -> Self {
+    pub fn new(policy: Option<Box<PolicyValueCallback>>) -> Self {
         Self { root: Node::new((INVALID_POSITION, INVALID_POSITION), Player::First, 1.), policy }
     }
 
@@ -182,7 +167,7 @@ impl Tree {
         }
     }
 
-    pub fn get_move_probs(&self, temp: f64) -> Vec<(Position, Position, f64)> { // from, to, prob
+    pub fn get_action_probs(&self, temp: f64) -> Vec<ActionProb> { // from, to, prob
         debug_assert!(!self.root.children.is_empty());
         let mut visits: Vec<f64> = self.root.children.iter().map(|node| node.n_visits as _).collect();
         for v in visits.iter_mut() {
@@ -195,7 +180,7 @@ impl Tree {
     // Choose a subtree and step into next state.
     // This is used in self-play to reuse the searched subtree.
     // note that in evaluation we should create new trees as the subtree is search assuming the opponent uses the same strategy.
-    pub fn chroot(&mut self, action: (Position, Position)) {
+    pub fn chroot(&mut self, action: Action) {
         let pos = self.root.children.iter().position(|n| n.action == action).expect("cannot find the action in root children");
         let child = self.root.children.swap_remove(pos);
         self.root = child;
@@ -204,8 +189,8 @@ impl Tree {
     // sample an action using the root visit counts.
     // exploration_prob: 0 in inference, 0.1 in self-play
     // temperature: 1e-3 in inference, 0.1 in self-play
-    pub fn sample_action(&mut self, exploration_prob: f64, temperature: f64) -> (Position, Position) {
-        let acts = self.get_move_probs(temperature);
+    pub fn sample_action(&mut self, exploration_prob: f64, temperature: f64) -> Action {
+        let acts = self.get_action_probs(temperature);
         // I don't understand why the paper introduces the Dirichlet distribution. It seems to me that it is quivalent to the following implementation.
         let sampled_act = if get_random_float() < exploration_prob {
             uniform_random_choice(&acts)

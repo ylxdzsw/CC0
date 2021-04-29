@@ -37,7 +37,7 @@ libcc0.dump.restype = None
 libcc0.destroy_game.argtypes = [ctypes.c_void_p]
 libcc0.destroy_game.restype = None
 
-libcc0.new_mcts.argtypes = [ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double))]
+libcc0.new_mcts.argtypes = [ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double))]
 libcc0.new_mcts.restype = ctypes.c_void_p
 
 libcc0.mcts_playout.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint64]
@@ -126,38 +126,36 @@ class Game:
         elif current_player == 2:
             return second_players_pieces, first_players_pieces
 
-    def destroy(self):
+    def __del__(self): # Python does not guarantee that libcc0 still exist when this code is run. But we are going to shut down anyway.
         libcc0.destroy_game(self.ptr)
 
 class MCTS:
     def __init__(self, policy_fun):
-
-        @ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double))
-        def _policy_fun(game_ptr, pick_p_out, move_p_out, value_out):
+        @ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double))
+        def _policy_fun(game_ptr, prior_out, value_out):
             game = Game(game_ptr)
-            pick_logsoftmax, move_logsoftmax, value = policy_fun(game)
+            prior_logsoftmax, value = policy_fun(game)
 
-            for i, p in enumerate(pick_logsoftmax.exp()):
-                pick_p_out[i] = float(p)
-                for j, p in enumerate(move_logsoftmax[i].exp()):
-                    move_p_out[i*game.board_size + j] = float(p)
+            for i, p in enumerate(prior_logsoftmax.reshape(-1).exp()): # PyTorch is row-major
+                prior_out[i] = float(p)
 
-            value_out[0] = value
+            value_out[0] = float(value)
 
-        self.ptr = libcc0.new_mcts(_policy_fun)
+        self.policy_fun = _policy_fun # prevent GC
+        self.ptr = libcc0.new_mcts(self.policy_fun)
 
     def playout(self, game, ntimes):
         libcc0.mcts_playout(self.ptr, game.ptr, ntimes)
 
-    def mcts_sample_action(self, exploration_prob, temperature):
+    def sample_action(self, exploration_prob, temperature):
         action = libcc0.mcts_sample_action(self.ptr, exploration_prob, temperature)
         return decode_action(action)
 
-    def mcts_chroot(self, old_pos, new_pos):
+    def chroot(self, old_pos, new_pos):
         libcc0.mcts_chroot(self.ptr, encode_action(old_pos, new_pos))
 
-    def mcts_total_visits(self):
+    def total_visits(self):
         return libcc0.mcts_total_visits(self.ptr)
 
-    def destroy(self):
+    def __del__(self):
         libcc0.destroy_mcts(self.ptr)

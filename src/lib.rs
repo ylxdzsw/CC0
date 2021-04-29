@@ -119,18 +119,31 @@ pub unsafe extern fn destroy_game(game: *mut game::Game) {
     Box::from_raw(game);
 }
 
+/// policy is represented by an array of n_pieces * board_size. policy[i * board_size + j] is the probability of move
+/// the i-th (in "dump" order) piece of the next player to the position j. The array should be normalized with invalid
+/// actions having probability 0.
 #[no_mangle]
-pub unsafe extern fn new_mcts(policy_cfun: extern fn (*mut game::Game, *mut f64, *mut f64, *mut f64)) -> *mut mcts::Tree {
-    let policy = Box::new(move |game: &game::Game| {
-        let mut pick_p = vec![0.0; game.n_pieces()];
-        let mut move_p = vec![0.0; game.n_pieces() * game.board_size()];
+pub unsafe extern fn new_mcts(policy_cfun: extern fn (*mut game::Game, *mut f64, *mut f64)) -> *mut mcts::Tree {
+    let policy_value_callback = Box::new(move |game: &game::Game| {
+        let mut prior = vec![0.0; game.n_pieces() * game.board_size()]; // TODO: uninited?
         let mut value = 0.0;
 
-        policy_cfun(game as *const _ as _, pick_p.as_mut_ptr(), move_p.as_mut_ptr(), &mut value as _);
+        policy_cfun(game as *const _ as _, prior.as_mut_ptr(), &mut value as _);
 
-        (pick_p, move_p, value)
+        let self_pieces: Vec<_> = game.get_pieces().iter().filter(|p| p.owner == game.next_player()).collect();
+        let board_size = game.board_size();
+
+        let mut action_probs = vec![];
+        for (from, moves) in game.movable_pieces_and_possible_moves_of_current_player() {
+            let i = self_pieces.iter().position(|x| x.position == from).expect("movable piece that not belongs to the player");
+            for to in moves {
+                action_probs.push((from, to, prior[i * board_size + to as usize]))
+            }
+        }
+
+        (action_probs, value)
     });
-    Box::leak(Box::new(mcts::Tree::new(Some(policy))))
+    Box::leak(Box::new(mcts::Tree::new(Some(policy_value_callback))))
 }
 
 #[no_mangle]

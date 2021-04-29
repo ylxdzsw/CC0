@@ -90,7 +90,7 @@ impl Game {
         &self.pieces
     }
 
-    /// find possible moves of p by BFS. result[i] = j means p can move to i via j. INVALID_POSITION means impossible move.
+    /// find possible moves of p by BFS. result[i] = j means p can move to i via j. INVALID_POSITION means unreachable.
     pub fn possible_moves_with_path(&self, pos: Position) -> Vec<Position> {
         let p = &self.pieces[self.pindex[pos as usize].unwrap()];
         let mut result = vec![INVALID_POSITION; self.board_def.board_size()];

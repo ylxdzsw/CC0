@@ -26,7 +26,6 @@ except:
             pos, moves = possible_moves[np.random.randint(len(possible_moves))]
             move = moves[np.random.randint(len(moves))]
             game.do_move(pos, move)
-        game.destroy()
 
     save(data, "data")
 
