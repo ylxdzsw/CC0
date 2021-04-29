@@ -56,7 +56,7 @@ libcc0.destroy_mcts.argtypes = [ctypes.c_void_p]
 libcc0.destroy_mcts.restype = None
 
 def encode_action(old_pos, new_pos):
-    return (old << 8) + new_pos
+    return (old_pos << 8) + new_pos
 
 def decode_action(action):
     return (action >> 8, action & 0xff)
@@ -65,10 +65,13 @@ class Game:
     def __init__(self, board_type="standard"):
         if board_type == "standard":
             self.ptr = libcc0.new_standard_game()
+            self.no_drop = False
         elif board_type == "small":
             self.ptr = libcc0.new_small_game()
+            self.no_drop = False
         else: # construct directly with ptr
             self.ptr = board_type
+            self.no_drop = True
 
         self.board_size = self.get_board_size()
         self.n_pieces = self.get_n_pieces()
@@ -127,7 +130,8 @@ class Game:
             return second_players_pieces, first_players_pieces
 
     def __del__(self): # Python does not guarantee that libcc0 still exist when this code is run. But we are going to shut down anyway.
-        libcc0.destroy_game(self.ptr)
+        if not self.no_drop:
+            libcc0.destroy_game(self.ptr)
 
 class MCTS:
     def __init__(self, policy_fun):
