@@ -34,7 +34,10 @@ libcc0.get_status.restype = ctypes.c_uint8
 libcc0.dump.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.POINTER(ctypes.c_uint8)), ctypes.POINTER(ctypes.c_uint64)]
 libcc0.dump.restype = None
 
-libcc0.new_mcts.argtypes = [ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double))]
+libcc0.destroy_game.argtypes = [ctypes.c_void_p]
+libcc0.destroy_game.restype = None
+
+libcc0.new_mcts.argtypes = [ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double))]
 libcc0.new_mcts.restype = ctypes.c_void_p
 
 libcc0.mcts_playout.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint64]
@@ -49,6 +52,9 @@ libcc0.mcts_chroot.restype = None
 libcc0.mcts_total_visits.argtypes = [ctypes.c_void_p]
 libcc0.mcts_total_visits.restype = ctypes.c_uint64
 
+libcc0.destroy_mcts.argtypes = [ctypes.c_void_p]
+libcc0.destroy_mcts.restype = None
+
 def encode_action(old_pos, new_pos):
     return (old << 8) + new_pos
 
@@ -61,6 +67,11 @@ class Game:
             self.ptr = libcc0.new_standard_game()
         elif board_type == "small":
             self.ptr = libcc0.new_small_game()
+        else: # construct directly with ptr
+            self.ptr = board_type
+
+        self.board_size = self.get_board_size()
+        self.n_pieces = self.get_n_pieces()
 
     def get_board_size(self):
         return libcc0.get_board_size(self.ptr)
@@ -115,9 +126,25 @@ class Game:
         elif current_player == 2:
             return second_players_pieces, first_players_pieces
 
+    def destroy(self):
+        libcc0.destroy_game(self.ptr)
+
 class MCTS:
     def __init__(self, policy_fun):
-        self.ptr = libcc0.new_mcts(policy_fun)
+
+        @ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double))
+        def _policy_fun(game_ptr, pick_p_out, move_p_out, value_out):
+            game = Game(game_ptr)
+            pick_logsoftmax, move_logsoftmax, value = policy_fun(game)
+
+            for i, p in enumerate(pick_logsoftmax.exp()):
+                pick_p_out[i] = float(p)
+                for j, p in enumerate(move_logsoftmax[i].exp()):
+                    move_p_out[i*game.board_size + j] = float(p)
+
+            value_out[0] = value
+
+        self.ptr = libcc0.new_mcts(_policy_fun)
 
     def playout(self, game, ntimes):
         libcc0.mcts_playout(self.ptr, game.ptr, ntimes)
@@ -131,3 +158,6 @@ class MCTS:
 
     def mcts_total_visits(self):
         return libcc0.mcts_total_visits(self.ptr)
+
+    def destroy(self):
+        libcc0.destroy_mcts(self.ptr)

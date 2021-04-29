@@ -115,6 +115,11 @@ pub unsafe extern fn dump(game: *mut game::Game, out: *mut *mut Position, length
 }
 
 #[no_mangle]
+pub unsafe extern fn destroy_game(game: *mut game::Game) {
+    Box::from_raw(game);
+}
+
+#[no_mangle]
 pub unsafe extern fn new_mcts(policy_cfun: extern fn (*mut game::Game, *mut f64, *mut f64, *mut f64)) -> *mut mcts::Tree {
     let policy = Box::new(move |game: &game::Game| {
         let mut pick_p = vec![0.0; game.n_pieces()];
@@ -148,4 +153,9 @@ pub unsafe extern fn mcts_chroot(mcts: *mut mcts::Tree, encoded_action: EncodedA
 #[no_mangle]
 pub unsafe extern fn mcts_total_visits(mcts: *mut mcts::Tree) -> u64 {
     (*mcts).total_visits()
+}
+
+#[no_mangle]
+pub unsafe extern fn destroy_mcts(mcts: *mut mcts::Tree) {
+    Box::from_raw(mcts);
 }

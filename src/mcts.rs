@@ -111,7 +111,7 @@ impl Node {
     }
 
     /// pick_p is a list similar to game.pieces. It should be normalized with illegal choices having 0 probabilities.
-    /// move_p is an array of (2 * n_pieces) * board_size. Eachline is the probabilities of moving targets. It should be normalized with illegal moves having 0 probabilities.
+    /// move_p is an array of (2 * n_pieces) * board_size. Eachline is the probabilities of moving targets. It should be normalized with illegal moves in each line having 0 probabilities. However, the lines that corresponding pick_p is 0 are not accessed and can have arbitrary value.
     fn expand(&mut self, game: &Game, pick_p: &[f64], move_p: &[f64]) {
         let pieces = game.get_pieces();
         let board_size = game.board_size();

@@ -1,14 +1,23 @@
 import torch
 import numpy as np
+from api import Game, MCTS
 from utils import save, load
-from environment import Environment
-from model import Model
+from model import Model, encode_input
 
-def self_play():
-    pass
+# playout a game and return [(state, action_probs, value)] of each selected node
+def self_play(board_type, model):
+
+    def policy_fun(game):
+        return model(*encode_input(game))
+    game = Game(board_type)
+    mcts = MCTS(policy_fun)
+
+
 
 def collect_self_play_data():
     # multi process
+    # model.eval()
+    # with torch.no_grad():
     pass
 
 def rotate_and_flip():
@@ -20,7 +29,7 @@ def train_step():
 def evaluate():
     pass
 
-model = Model().cuda()
+model = Model()
 loss = torch.nn.BCELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-5)
 best = .1

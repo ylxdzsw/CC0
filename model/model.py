@@ -36,3 +36,24 @@ class Model(torch.nn.Module):
         value_before_pooling = self.value_decoder(embeddings).permute(1, 2, 0)
         value = torch.squeeze(self.value_decoder_final(torch.squeeze(torch.nn.functional.avg_pool1d(value_before_pooling, pieces.size()[1]), 2)), 1)
         return pick_logsoftmax, move_logsoftmax, value
+
+def encode_input(game):
+    board_size, n_pieces = game.board_size, game.n_pieces
+    self_pieces, oppo_pieces = game.dump()
+    possible_moves = game.all_possible_moves()
+
+    pieces = np.zeros((1, 2 * n_pieces), dtype=np.int32)
+    pick_mask = np.zeros((1, 2 * n_pieces), dtype=np.int32)
+    move_mask = np.zeros((1, 2 * n_pieces, board_size), dtype=np.int32)
+
+    pieces[0, :n_pieces] = self_pieces
+    pieces[0, n_pieces:] = np.array(oppo_pieces) + board_size
+
+    for pos, moves in all_possible_moves:
+        i = self_pieces.index(pos)
+        pick_mask[0, i] = 1
+
+        for j in moves:
+            move_mask[0, i, j] = 1
+
+    return pieces, pick_mask, move_mask
