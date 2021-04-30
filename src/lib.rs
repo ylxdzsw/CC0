@@ -32,6 +32,7 @@ pub unsafe extern fn alloc_memory(byte_size: u64) -> *mut u8 {
 
 #[no_mangle]
 pub unsafe extern fn free_memory(ptr: *mut u8, byte_size: u64) {
+    // Note the second argument is the length. We set it equals to capacity, which may causing droping uninitialized memory if we were dealing with element types that are not u8.
     Vec::from_raw_parts(ptr, byte_size as _, byte_size as _);
 }
 
@@ -110,7 +111,7 @@ pub unsafe extern fn dump(game: *mut game::Game, out: *mut *mut Position, length
         }
     }
 
-    *length = encoded.len() as _;
+    *length = encoded.capacity() as _;
     *out = encoded.leak() as *const _ as _;
 }
 
@@ -126,9 +127,13 @@ pub unsafe extern fn destroy_game(game: *mut game::Game) {
 pub unsafe extern fn new_mcts(policy_cfun: extern fn (*mut game::Game, *mut f64, *mut f64)) -> *mut mcts::Tree {
     let policy_value_callback = Box::new(move |game: &game::Game| {
         let mut prior = vec![0.0; game.n_pieces() * game.board_size()]; // TODO: uninited?
-        let mut value = 0.0;
+        let mut value = f64::NAN; // invalid value to check if `policy_fun` runs correctly
 
         policy_cfun(game as *const _ as _, prior.as_mut_ptr(), &mut value as _);
+
+        if value.is_nan() { // `policy_fun` did not exit correctly, possibly raised exception as the result of Ctrl-C
+            panic!("policy callback did not run correctly"); // or should abort?
+        }
 
         let self_pieces: Vec<_> = game.get_pieces().iter().filter(|p| p.owner == game.next_player()).collect();
         let board_size = game.board_size();
@@ -152,6 +157,24 @@ pub unsafe extern fn mcts_playout(mcts: *mut mcts::Tree, game: *mut game::Game, 
 }
 
 #[no_mangle]
+pub unsafe extern fn mcts_get_action_probs(mcts: *mut mcts::Tree, temp: f64, actions: *mut EncodedAction, probs: *mut f64, length: *mut u64) {
+    let action_probs = (*mcts).get_action_probs(temp);
+    *length = action_probs.len() as _;
+
+    if actions.is_null() || probs.is_null() { // this call just queries the length for allocation.
+        return
+    }
+
+    let actions = core::slice::from_raw_parts_mut(actions, action_probs.len());
+    let probs = core::slice::from_raw_parts_mut(probs, action_probs.len());
+
+    for (i, (from, to, p)) in action_probs.into_iter().enumerate() {
+        actions[i] = encode_action(from, to);
+        probs[i] = p
+    }
+}
+
+#[no_mangle]
 pub unsafe extern fn mcts_sample_action(mcts: *mut mcts::Tree, exploration_prob: f64, temperature: f64) -> EncodedAction {
     let (from, to) = (*mcts).sample_action(exploration_prob, temperature);
     encode_action(from, to)
@@ -167,6 +190,12 @@ pub unsafe extern fn mcts_chroot(mcts: *mut mcts::Tree, encoded_action: EncodedA
 pub unsafe extern fn mcts_total_visits(mcts: *mut mcts::Tree) -> u64 {
     (*mcts).total_visits()
 }
+
+#[no_mangle]
+pub unsafe extern fn mcts_root_value(mcts: *mut mcts::Tree) -> f64 {
+    (*mcts).root_value()
+}
+
 
 #[no_mangle]
 pub unsafe extern fn destroy_mcts(mcts: *mut mcts::Tree) {

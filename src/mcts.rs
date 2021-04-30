@@ -204,6 +204,10 @@ impl Tree {
     pub fn total_visits(&self) -> u64 {
         return self.root.n_visits
     }
+
+    pub fn root_value(&self) -> f64 {
+        return self.root.q
+    }
 }
 
 #[cfg(test)]

@@ -43,6 +43,9 @@ libcc0.new_mcts.restype = ctypes.c_void_p
 libcc0.mcts_playout.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint64]
 libcc0.mcts_playout.restype = None
 
+libcc0.mcts_get_action_probs.argtypes = [ctypes.c_void_p, ctypes.c_double, ctypes.POINTER(ctypes.c_uint64), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_uint64)]
+libcc0.mcts_get_action_probs.restype = None
+
 libcc0.mcts_sample_action.argtypes = [ctypes.c_void_p, ctypes.c_double, ctypes.c_double]
 libcc0.mcts_sample_action.restype = ctypes.c_uint64
 
@@ -51,6 +54,9 @@ libcc0.mcts_chroot.restype = None
 
 libcc0.mcts_total_visits.argtypes = [ctypes.c_void_p]
 libcc0.mcts_total_visits.restype = ctypes.c_uint64
+
+libcc0.mcts_root_value.argtypes = [ctypes.c_void_p]
+libcc0.mcts_root_value.restype = ctypes.c_double
 
 libcc0.destroy_mcts.argtypes = [ctypes.c_void_p]
 libcc0.destroy_mcts.restype = None
@@ -151,6 +157,16 @@ class MCTS:
     def playout(self, game, ntimes):
         libcc0.mcts_playout(self.ptr, game.ptr, ntimes)
 
+    def get_action_probs(self, temp=1e-3):
+        length = ctypes.c_uint64(0)
+        libcc0.mcts_get_action_probs(self.ptr, temp, None, None, ctypes.byref(length))
+
+        actions_buffer = (ctypes.c_uint64 * length.value)()
+        probs_buffer = (ctypes.c_double * length.value)()
+
+        libcc0.mcts_get_action_probs(self.ptr, temp, actions_buffer, probs_buffer, ctypes.byref(length))
+        return [ (*decode_action(actions_buffer[i]), probs_buffer[i]) for i in range(length.value) ]
+
     def sample_action(self, exploration_prob, temperature):
         action = libcc0.mcts_sample_action(self.ptr, exploration_prob, temperature)
         return decode_action(action)
@@ -160,6 +176,9 @@ class MCTS:
 
     def total_visits(self):
         return libcc0.mcts_total_visits(self.ptr)
+
+    def root_value(self):
+        return libcc0.mcts_root_value(self.ptr)
 
     def __del__(self):
         libcc0.destroy_mcts(self.ptr)
