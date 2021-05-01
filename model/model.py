@@ -4,7 +4,7 @@ import numpy as np
 class Model(torch.nn.Module):
     def __init__(self, board_size):
         super(Model, self).__init__()
-        self.embedding = torch.nn.Embedding(board_size*2, 192)
+        self.embedding = torch.nn.Embedding(board_size * 4, 192)
         self.shared_encoder = torch.nn.TransformerEncoder(torch.nn.TransformerEncoderLayer(192, nhead=6, dim_feedforward=256), 8)
         self.policy_encoder = torch.nn.Sequential(
             torch.nn.Linear(192, 256),
@@ -37,20 +37,32 @@ class Model(torch.nn.Module):
 
         return policy, value
 
-def encode_input(game):
+def encode_input(game, action_probs=None):
     board_size, n_pieces = game.board_size, game.n_pieces
-    self_pieces, oppo_pieces = game.dump()
+    player, first_pieces, second_pieces = game.dump()
+    player_offset = 0 if player == 1 else 2 * board_size
+    if player == 1:
+        self_pieces, oppo_pieces = first_pieces, second_pieces
+    elif player == 2:
+        self_pieces, oppo_pieces = second_pieces, first_pieces
     possible_moves = game.all_possible_moves()
 
     pieces = np.zeros(2 * n_pieces, dtype=np.int32)
     mask = np.zeros(n_pieces * board_size, dtype=np.int32)
 
-    pieces[:n_pieces] = self_pieces
-    pieces[n_pieces:] = np.array(oppo_pieces) + board_size
+    pieces[:n_pieces] = np.array(self_pieces) + player_offset
+    pieces[n_pieces:] = np.array(oppo_pieces) + board_size + player_offset
 
     for pos, moves in possible_moves:
         i = self_pieces.index(pos)
         for j in moves:
             mask[i * board_size + j] = 1
 
-    return pieces, mask
+    if action_probs is None:
+        return pieces, mask
+
+    probs = np.zeros(n_pieces * board_size, dtype=np.float32)
+    for old_pos, new_pos, prob in action_probs:
+        i = self_pieces.index(old_pos)
+        probs[i * board_size + new_pos] = 1
+    return pieces, mask, probs

@@ -2,9 +2,13 @@ use crate::{INVALID_POSITION, Position, game::{Status, Game, Player}};
 use alloc::vec::Vec;
 use ordered_float::OrderedFloat;
 
-fn get_random_number() -> u32 {
-    static mut RANDOM: u32 = 39393;
+static mut RANDOM: u32 = 39393;
 
+pub fn set_random_seed(seed: u32) {
+    unsafe { RANDOM = seed }
+}
+
+fn get_random_number() -> u32 {
     unsafe {
         RANDOM ^= RANDOM << 13;
         RANDOM ^= RANDOM >> 17;
@@ -62,7 +66,7 @@ impl Node {
 
     /// playout a game and update the path, return the leaf_value for the parent
     // Note about leaf_value: the leaf_value applied to a node should be large if the action of the node is favorable for the last player (it is the `player` of the node)
-    fn playout_and_update_recursive(&mut self, game: &mut Game, policy: Option<&PolicyValueCallback>) -> f64 {
+    fn playout_and_update_recursive(&mut self, mut game: Game, policy: Option<&PolicyValueCallback>) -> f64 {
         if self.is_leaf() {
             let leaf_value = match game.status() {
                 Status::Winner(winner) => {
@@ -71,11 +75,11 @@ impl Node {
                 Status::Tie => 0.,
                 Status::Unfinished => {
                     if let Some(policy) = policy { // use policy value to estimate
-                        let (action_probs, value) = policy(game); // the game's next player is the other player (not the node's player). The value returned by the NN is about the game state, which describe how likely the next player can win.
-                        self.expand(game, &action_probs);
-                        -value
+                        let (action_probs, value) = policy(&game);
+                        self.expand(&game, &action_probs);
+                        -value // the game's next player is the other player (not the node's player). The value returned by the NN is about the game state, which describe how likely the next player (the player that is going to take action acroding to the policy) can win.
                     } else { // pure mcts, uniformly expand and use random rollout until end to estimate value
-                        self.expand_uniform(game);
+                        self.expand_uniform(&game);
                         self.rollout(game)
                     }
                 }
@@ -133,7 +137,7 @@ impl Node {
         }
     }
 
-    fn rollout(&self, game: &mut Game) -> f64 {
+    fn rollout(&self, mut game: Game) -> f64 {
         while !game.status().finished() {
             let all_valid_moves = game.movable_pieces_and_possible_moves_of_current_player();
             let (from, moves) = uniform_random_choice(&all_valid_moves);
@@ -163,7 +167,7 @@ impl Tree {
     pub fn playout(&mut self, game: &Game, ntimes: usize) {
         self.root.player = game.last_player(); // the children of root will be the one play next
         for _ in 0..ntimes {
-            self.root.playout_and_update_recursive(&mut game.clone(), self.policy.as_deref());
+            self.root.playout_and_update_recursive(game.clone(), self.policy.as_deref());
         }
     }
 
@@ -190,6 +194,14 @@ impl Tree {
     // exploration_prob: 0 in inference, 0.1 in self-play
     // temperature: 1e-3 in inference, 0.1 in self-play
     pub fn sample_action(&mut self, exploration_prob: f64, temperature: f64) -> Action {
+        // let mut children: Vec<_> = self.root.children.iter().map(|c| (c.action, c.n_visits, c.q)).collect();
+        // children.sort_by_key(|x| OrderedFloat(-x.2));
+        // for i in 0..5 {
+        //     if i < children.len() {
+        //         println!("{:?}", children[i])
+        //     }
+        // }
+
         let acts = self.get_action_probs(temperature);
         // I don't understand why the paper introduces the Dirichlet distribution. It seems to me that it is quivalent to the following implementation.
         let sampled_act = if get_random_float() < exploration_prob {

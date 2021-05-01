@@ -1,11 +1,13 @@
 import torch
 import numpy as np
 from multiprocessing import Pool
-from api import Game, MCTS
+from api import Game, MCTS, set_random_seed
 from utils import save, load
 from model import Model, encode_input
 
-# playout a game and collect game trace ([(self_pieces, oppo_pieces, action_probs)], result)
+# playout a game and collect data for training [(pieces, masks, probs, result)]
+# result means the winning rate (in -1 ~ 1 scale) of the player that is going to take action acroding to action_probs
+# TODO: augmentation by horizontal fliping?
 def self_play(board_type, model):
     @torch.no_grad()
     def policy_fun(game):
@@ -18,56 +20,109 @@ def self_play(board_type, model):
     game = Game(board_type)
     mcts = MCTS(policy_fun)
 
-    record = []
+    data = [] # (pieces, masks, probs)
 
     while True:
         status = game.get_status()
         if status != 0:
-            break
+            if status == 1:
+                return [ (*x, 1 if i%2 == 0 else -1) for i, x in enumerate(data) ]
+            if status == 2:
+                return [ (*x, -1 if i%2 == 0 else 1) for i, x in enumerate(data) ]
+            if status == 3:
+                return [ (*x, 0) for x in data ]
+            return record, status
 
         mcts.playout(game, 800 - mcts.total_visits())
 
-        state = game.dump()
         action_probs = mcts.get_action_probs(1e-3)
-        value = mcts.root_value()
+        pieces, mask, probs = encode_input(game, action_probs)
 
-        record.append((*state, action_probs))
-        print(state, action_probs, value)
+        data.append((pieces, mask, probs))
 
-        old_pos, new_pos = mcts.sample_action(0., 1e-3)
+        # state = game.dump()
+        # value = mcts.root_value()
+        # print(state, action_probs, value)
+
+        old_pos, new_pos = mcts.sample_action(0.1, 0.1) # the temperature used for self-play is not the same as for collecting trace
         game.do_move(old_pos, new_pos)
         mcts.chroot(old_pos, new_pos)
 
-    return record
+def worker_init(model_path):
+    global model
+    torch.set_num_threads(1)
+    import os
+    set_random_seed(os.getpid() * 7 + 39393)
+    model = torch.jit.load(model_path).eval()
 
-# replay the game and generate masks for training. Also augment the data by rotating and fliping.
-def trace_to_data():
-    pass
-
-# load the model and self-play several rounds. This method is used as the entry point of workers.
-def self_play_batch(board_type, model_path, ntimes):
-    pass
+def worker_run(board_type):
+    global model
+    return self_play(board_type, model)
 
 # inference performance: CUDA: 60 playouts/s, SingleThreadCPU: 80 playouts/s, MultiThreadCPU: 105 playouts/s but uses 40% of all 16 cores.
-# TorchScript jit gives around 10% performance gain.
+# TorchScript jit further gives around 10% performance gain.
 # Therefore we choose to play multiple games concurrently, each use only one thread.
-def collect_self_play_data():
-    # multi process
-    pass
+def collect_self_play_data(model, n=1000):
+    model.cpu().save('scripted_model.pt')
+    with Pool(8, initializer=worker_init, initargs=('scripted_model.pt',)) as pool:
+        data_batches = pool.map(worker_run, ('small' for _ in range(n)))
+    return [ x for batch in data_batches for x in batch ]
 
+def random_batch(data, batch_size):
+    return *(np.stack(d, axis=0) for d in zip(*( data[i] for i in np.random.randint(len(data), size=batch_size) ))),
 
+def train(model, optimizer, data):
+    model.train()
 
-def train_step():
-    pass
+    best = .1
+    epoch = 0
+
+    while epoch < 2000:
+        pieces, masks, probs, scores = ( torch.from_numpy(x).cuda() for x in random_batch(data, 32) )
+        policy, value = model(pieces, masks)
+        policy_loss = -torch.mean(torch.sum(probs * policy, 1))
+        value_loss = torch.nn.functional.mse_loss(value, scores)
+
+        (policy_loss + value_loss).backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), .6)
+        optimizer.step()
+        epoch += 1
+        if epoch % 20 == 0:
+            print(policy_loss, value_loss)
 
 def evaluate():
     pass
 
 if __name__ == '__main__':
+    import sys
 
+    model = torch.jit.script(Model(73)).cuda()
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-5)
+    r = -1
 
-    torch.set_num_threads(1)
+    try:
+        checkpoint = load(sys.argv[1])
+        model.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        r = checkpoint['r']
+    except:
+        pass
 
-    model = torch.jit.script(Model(121)) # gives around 10% performance gain
+    while True:
+        r += 1
 
-    self_play("standard", model)
+        try:
+            data = load("data_{}".format(r))
+        except:
+            print("collecting data")
+            data = collect_self_play_data(model, 64)
+            save(data, "data_{}".format(r))
+
+        print("load last 5 rounds data")
+        for i in range(r-5, r):
+            if i >= 0:
+                data.extend(load("data_".format(i)))
+
+        print("training model")
+        train(model, optimizer, data)
+        save({ 'r': r, 'model_state_dict': model.state_dict(), 'optimizer_state_dict': optimizer.state_dict() }, "model_{}".format(r))

@@ -7,4 +7,6 @@ node_modules
 dist
 *.wasm
 data
+data_*
 checkpoint_*
+scripted_model.pt

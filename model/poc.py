@@ -20,7 +20,11 @@ except:
             if i > 50: # only starts from there
                 p = normalize([len(moves) for pos, moves in possible_moves]) # prefer pieces that have more possible moves
                 i = np.random.choice(range(len(possible_moves)), p=p)
-                self_pieces, oppo_pieces = game.dump()
+                player, first_pieces, second_pieces = game.dump()
+                if player == 1:
+                    self_pieces, oppo_pieces = first_pieces, second_pieces
+                elif player == 2:
+                    self_pieces, oppo_pieces = second_pieces, first_pieces
                 data.append((self_pieces, oppo_pieces, possible_moves[i][0], possible_moves[i][1]))
 
             pos, moves = possible_moves[np.random.randint(len(possible_moves))]

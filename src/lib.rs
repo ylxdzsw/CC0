@@ -37,6 +37,11 @@ pub unsafe extern fn free_memory(ptr: *mut u8, byte_size: u64) {
 }
 
 #[no_mangle]
+pub unsafe extern fn set_random_seed(seed: u32) {
+    mcts::set_random_seed(seed)
+}
+
+#[no_mangle]
 pub unsafe extern fn new_standard_game() -> *mut game::Game {
     Box::leak(Box::new(game::Game::new(&board::STANDARD_BOARD)))
 }

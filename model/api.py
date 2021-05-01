@@ -10,6 +10,9 @@ libcc0.alloc_memory.restype = ctypes.POINTER(ctypes.c_uint8)
 libcc0.free_memory.argtypes = [ctypes.POINTER(ctypes.c_uint8), ctypes.c_uint64]
 libcc0.free_memory.restype = None
 
+libcc0.set_random_seed.argtypes = [ctypes.c_uint32]
+libcc0.set_random_seed.restype = None
+
 libcc0.new_standard_game.argtypes = []
 libcc0.new_standard_game.restype = ctypes.c_void_p
 
@@ -117,7 +120,7 @@ class Game:
     def get_status(self):
         return libcc0.get_status(self.ptr)
 
-    # return (self pieces, opponent pieces)
+    # return (player, first player's pieces' positions, second player's pieces' positions)
     def dump(self):
         buffer_ptr = ctypes.POINTER(ctypes.c_uint8)()
         size = ctypes.c_uint64(0)
@@ -130,10 +133,7 @@ class Game:
 
         libcc0.free_memory(buffer_ptr, size)
 
-        if current_player == 1:
-            return first_players_pieces, second_players_pieces
-        elif current_player == 2:
-            return second_players_pieces, first_players_pieces
+        return current_player, first_players_pieces, second_players_pieces
 
     def __del__(self): # Python does not guarantee that libcc0 still exist when this code is run. But we are going to shut down anyway.
         if not self.no_drop:
@@ -182,3 +182,6 @@ class MCTS:
 
     def __del__(self):
         libcc0.destroy_mcts(self.ptr)
+
+def set_random_seed(seed):
+    libcc0.set_random_seed(seed)
