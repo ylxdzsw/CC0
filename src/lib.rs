@@ -61,7 +61,15 @@ pub unsafe extern fn get_n_pieces(game: *mut game::Game) -> u64 {
     (*game).n_pieces() as _
 }
 
-/// returned list is encoded as [INVALID_POSITION, pieces_pos_1, pieces_move_1, pieces_move_2, INVALID_POSITION, pieces_pos_1, ...]
+/// the returned length is only used for deallocation. The `out` length is the same as board size and not explicitly returned.
+#[no_mangle]
+pub unsafe extern fn possible_moves_with_path(game: *mut game::Game, pos: Position, out: *mut *mut Position, length: *mut u64) {
+    let possible_moves_with_path = (*game).possible_moves_with_path(pos);
+    *length = possible_moves_with_path.capacity() as _;
+    *out = possible_moves_with_path.leak() as *const _ as _;
+}
+
+/// returned list is encoded as [INVALID_POSITION, pieces_pos_1, pieces_move_1, pieces_move_2, INVALID_POSITION, pieces_pos_1, ..., INVALID_POSITION, INVALID_POSITION]
 #[no_mangle]
 pub unsafe extern fn all_possible_moves(game: *mut game::Game, out: *mut *mut Position, length: *mut u64) {
     let possible_moves = (*game).movable_pieces_and_possible_moves_of_current_player();
@@ -73,7 +81,11 @@ pub unsafe extern fn all_possible_moves(game: *mut game::Game, out: *mut *mut Po
         encoded.append(&mut moves);
     }
 
-    *length = encoded.len() as _;
+    // terminated with two INVALID_POSITIONs
+    encoded.push(INVALID_POSITION);
+    encoded.push(INVALID_POSITION);
+
+    *length = encoded.capacity() as _;
     *out = encoded.leak() as *const _ as _;
 }
 
@@ -97,6 +109,7 @@ pub unsafe extern fn get_status(game: *mut game::Game) -> u8 {
 /// 1st byte: n_pieces
 /// 2nd byte: current player. 1 for the first player, 2 for the second.
 /// following 2*`n_pieces` bytes: the position of each pieces, with the first half belongs to the first player.
+/// the returned length is only used for deallocation. The `out` length is determined by 2 + 2 * n_pieces
 #[no_mangle]
 pub unsafe extern fn dump(game: *mut game::Game, out: *mut *mut Position, length: *mut u64) {
     let game = &mut *game;

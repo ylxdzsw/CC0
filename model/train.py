@@ -74,21 +74,23 @@ def random_batch(data, batch_size):
 def train(model, optimizer, data):
     model.train()
 
-    best = .1
-    epoch = 0
-
-    while epoch < 2000:
-        pieces, masks, probs, scores = ( torch.from_numpy(x).cuda() for x in random_batch(data, 32) )
+    acc = 0, 0
+    for epoch in range(1000):
+        # pieces, masks, probs, scores = ( torch.from_numpy(x).cuda() for x in random_batch(data, 32) )
+        pieces, masks, probs, scores = ( torch.from_numpy(x) for x in random_batch(data, 32) )
         policy, value = model(pieces, masks)
         policy_loss = -torch.mean(torch.sum(probs * policy, 1))
-        value_loss = torch.nn.functional.mse_loss(value, scores)
+        value_loss = torch.nn.functional.mse_loss(value, scores.float())
 
         (policy_loss + value_loss).backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), .6)
         optimizer.step()
         epoch += 1
-        if epoch % 20 == 0:
-            print(policy_loss, value_loss)
+
+        acc = acc[0] + policy_loss.item() / 50, acc[1] + value_loss.item() / 50
+        if epoch % 50 == 0:
+            print(*acc)
+            acc = 0, 0
 
 def evaluate():
     pass
@@ -96,8 +98,8 @@ def evaluate():
 if __name__ == '__main__':
     import sys
 
-    model = torch.jit.script(Model(73)).cuda()
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-5)
+    model = torch.jit.script(Model(73))
+    optimizer = torch.optim.Adam(model.parameters(), lr=3e-5) # weight_decay=5e-6
     r = -1
 
     try:
@@ -118,11 +120,13 @@ if __name__ == '__main__':
             data = collect_self_play_data(model, 64)
             save(data, "data_{}".format(r))
 
-        print("load last 5 rounds data")
-        for i in range(r-5, r):
-            if i >= 0:
-                data.extend(load("data_".format(i)))
+        print("load last 10 rounds data")
+        for i in range(r-10, r):
+            if i < 0:
+                continue
+            data.extend(load("data_{}".format(i)))
 
         print("training model")
+        # model.cuda()
         train(model, optimizer, data)
         save({ 'r': r, 'model_state_dict': model.state_dict(), 'optimizer_state_dict': optimizer.state_dict() }, "model_{}".format(r))

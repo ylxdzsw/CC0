@@ -98,9 +98,11 @@ class Game:
 
         possible_moves = []
         state = -1
-        for i in range(size.value):
+        for i in range(size.value): # size is the capacity of the vector, the actual length may be smaller
             x = buffer_ptr[i]
             if state == 0: # reading piece position
+                if x == INVALID_POSITION: # terminated
+                    break
                 possible_moves.append((x, []))
                 state = 1
             else: # reading moving targets

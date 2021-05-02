@@ -34,6 +34,14 @@ canvas =
                 else
                     slot.fill 'transparent'
 
+app =
+    init: ->
+
+
+
+    select: (id) ->
+
+
 window.replay = (records) ->
     button = document.createElement 'button'
     button.innerHTML = 'next'
@@ -49,6 +57,7 @@ main = (ready) ->
     canvas.init SmallBoard
 
     do canvas.reset
+
 
     # rect = draw.rect 100, 100
     #     .attr fill: '#f06'

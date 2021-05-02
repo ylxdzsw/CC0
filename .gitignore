@@ -8,5 +8,6 @@ dist
 *.wasm
 data
 data_*
+model_*
 checkpoint_*
 scripted_model.pt
