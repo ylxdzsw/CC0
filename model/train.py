@@ -75,7 +75,7 @@ def train(model, optimizer, data):
     model.train()
 
     acc = 0, 0
-    for epoch in range(1000):
+    for epoch in range(2000):
         # pieces, masks, probs, scores = ( torch.from_numpy(x).cuda() for x in random_batch(data, 32) )
         pieces, masks, probs, scores = ( torch.from_numpy(x) for x in random_batch(data, 32) )
         policy, value = model(pieces, masks)
@@ -88,7 +88,7 @@ def train(model, optimizer, data):
         epoch += 1
 
         acc = acc[0] + policy_loss.item() / 50, acc[1] + value_loss.item() / 50
-        if epoch % 50 == 0:
+        if epoch % 50 == 49:
             print(*acc)
             acc = 0, 0
 
@@ -99,7 +99,7 @@ if __name__ == '__main__':
     import sys
 
     model = torch.jit.script(Model(73))
-    optimizer = torch.optim.Adam(model.parameters(), lr=3e-5) # weight_decay=5e-6
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-5, weight_decay=1e-6)
     r = -1
 
     try:

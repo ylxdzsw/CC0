@@ -64,5 +64,6 @@ def encode_input(game, action_probs=None):
     probs = np.zeros(n_pieces * board_size, dtype=np.float32)
     for old_pos, new_pos, prob in action_probs:
         i = self_pieces.index(old_pos)
-        probs[i * board_size + new_pos] = 1
+        assert i >= 0
+        probs[i * board_size + new_pos] = prob
     return pieces, mask, probs
