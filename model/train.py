@@ -87,8 +87,8 @@ def train(model, optimizer, data):
         optimizer.step()
         epoch += 1
 
-        acc = acc[0] + policy_loss.item() / 50, acc[1] + value_loss.item() / 50
-        if epoch % 50 == 49:
+        acc = acc[0] + policy_loss.item() / 100, acc[1] + value_loss.item() / 100
+        if epoch % 100 == 99:
             print(*acc)
             acc = 0, 0
 
@@ -99,7 +99,7 @@ if __name__ == '__main__':
     import sys
 
     model = torch.jit.script(Model(73))
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-5, weight_decay=1e-6)
+    optimizer = torch.optim.Adam(model.parameters(), lr=2e-5, weight_decay=1e-6)
     r = -1
 
     try:
