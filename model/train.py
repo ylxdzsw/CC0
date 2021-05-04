@@ -117,11 +117,11 @@ if __name__ == '__main__':
             data = load("data_{}".format(r))
         except:
             print("collecting data")
-            data = collect_self_play_data(model, 64)
+            data = collect_self_play_data(model, 100)
             save(data, "data_{}".format(r))
 
-        print("load last 10 rounds data")
-        for i in range(r-10, r):
+        print("load last 5 rounds data")
+        for i in range(r-5, r):
             if i < 0:
                 continue
             data.extend(load("data_{}".format(i)))

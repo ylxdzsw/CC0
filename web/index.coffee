@@ -1,14 +1,13 @@
-app =
-    init: ->
+window.app =
+    init: (remote_player) ->
 
+    click: (pos) ->
 
-
-    select: (id) ->
-
+    remote_move: (old_pos, new_pos) ->
 
 window.replay = (records) ->
     button = document.createElement 'button'
-    button.innerHTML = 'next'
+    button.textContent = 'next'
     button.addEventListener 'click', ->
         [old_pos, new_pos] = do records.shift
         canvas.move_no_trace old_pos, new_pos
@@ -16,22 +15,13 @@ window.replay = (records) ->
     document.querySelector 'body'
         .appendChild button
 
-main = (ready) ->
-    await ready
-    canvas.init SmallBoard
+do ->
+    await Promise.all [
+        do api.init
+        do pvp.init
+    ]
 
-    do canvas.reset
+    do canvas.init
+    canvas.reset 'small'
 
-
-    # rect = draw.rect 100, 100
-    #     .attr fill: '#f06'
-
-    # m = solver.alloc_memory 4n
-    # m = new Uint8Array solver.memory.buffer, m, 4
-    # m.set [15, 15, 15, 15]
-    # r = solver.algorithm_x m.byteOffset, 4n
-    # r = new Uint8Array solver.memory.buffer, r, 3
-    # console.log r
-    # solver.free_memory(m.byteOffset, 4n)
-    # solver.free_memory(r.byteOffset, 3n)
 

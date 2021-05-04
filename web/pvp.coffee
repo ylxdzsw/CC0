@@ -1,41 +1,46 @@
-peer = new Peer('cc0_283_ylxdzsw')
-peer.on('open', function(id) {
-  console.log('My peer ID is: ' + id);
-})
-peer.on('connection', function(conn) {
-    conn.on('open', function() {
-        conn.send('greetings from 1')
+window.pvp =
+    init: -> new Promise (resolve, reject) =>
+        @self_id = Math.floor(Math.random() * 1000000)
+        @peer = new Peer "cc0_#{@self_id}_cc0"
+        @peer.on 'open', => do resolve
+        @peer.on 'error', (err) => @handle_peer_error err
+        @peer.on 'connection', (conn) => @accept_connection conn
+        @status = 'listening'
+        el = document.querySelector '#self-id'
+        el.textContent = "My id: #{@self_id}"
 
-    })
-    conn.on('data', function(data) {
-        console.log('Received', data);
-    })
-    conn.on('error', function(err) {
-        console.error(err)
-    })
-});
-peer.on('error', function(err) {
-    console.error(err)
-})
+    connect: (target_id) -> new Promise (resolve, reject) =>
+        if @status isnt 'listening'
+            console.error "try to connect to #{target_id} while #{@status}"
+            do reject
 
-peer = new Peer('cc0_33_ylxdzsw')
-peer.on('open', function(id) {
-  console.log('My peer ID is: ' + id);
-  conn = peer.connect('cc0_283_ylxdzsw')
-  conn.on('open', function(what) {
-    conn.on('data', function(data) {
-        console.log('Received:', data);
-    })
-    conn.on('error', function(err) {
-        console.error(err)
-    })
-    conn.send('greetings from 2')
-    conn.on('error', function(err) {
-        console.error(err)
-    })
-  })
+        @conn = peer.connect "cc0_#{target_id}_cc0"
+        @conn.on 'open', =>
+            @status = 'connected'
+            do resolve
+        @conn.on 'data', (msg) => @handle_message msg
+        @conn.on 'error', (err) => @handle_conn_error err
 
-})
-peer.on('error', function(err) {
-    console.error(err)
-})
+        @status = 'connecting'
+
+    accept_connection: (conn) ->
+        if @status isnt 'listening'
+            console.error "being connected while #{@status}"
+            # todo: terminate the incoming connection
+
+        @conn = conn
+        @conn.on 'open', =>
+            @status = 'connected'
+        @conn.on 'data', (msg) => @handle_message msg
+        @conn.on 'error', (err) => @handle_conn_error err
+
+        @status = 'connecting'
+
+    handle_peer_error: (err) ->
+        console.error err
+
+    handle_conn_error: (err) ->
+        console.error err
+
+    handle_message: (msg) ->
+        console.log 'received: ' + msg

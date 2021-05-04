@@ -1,7 +1,7 @@
 window.canvas =
-    init: (@board=StandardBoard, @scale=4, @padding=10) ->
+    init: (@scale=4, @padding=10) ->
         @svg = SVG().addTo('#canvas').size(100*@scale+2*@padding, 100*@scale+2*@padding)
-        @slots = do @draw_board_skeleton
+        # @slots = do @draw_board_skeleton
 
     draw_board_skeleton: ->
         @slot_group = do @svg.group
@@ -11,8 +11,7 @@ window.canvas =
                 .fill 'transparent'
                 .stroke 'black'
                 .remember 'id', i
-                .on 'click', ->
-                    console.log @remember 'id'
+                .on 'click', -> app.click @remember 'id'
 
     move_no_trace: (old_pos, new_pos) ->
         color = @slots[old_pos].remember 'color'
@@ -23,7 +22,15 @@ window.canvas =
             .fill color
             .remember 'color', color
 
-    reset: ->
+    reset: (board_type='standard') ->
+        switch board_type
+            when 'tiny' then @board = TinyBoard
+            when 'small' then @board = SmallBoard
+            when 'standard' then @board = StandardBoard
+            when 'large' then @board = LargeBoard
+            when 'huge' then @board = HugeBoard
+            else return console.error 'unknown board'
+
         [self_slots, oppo_slots] = @board.base_ids
         for slot in @slots
             switch
