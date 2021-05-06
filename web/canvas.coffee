@@ -1,6 +1,16 @@
 window.canvas =
-    init: (@scale=4, @padding=10) ->
+    init: (board_type='standard', @scale=4, @padding=10) ->
+        switch board_type
+            when 'tiny' then @board = TinyBoard
+            when 'small' then @board = SmallBoard
+            when 'standard' then @board = StandardBoard
+            when 'large' then @board = LargeBoard
+            when 'huge' then @board = HugeBoard
+            else return console.error 'unknown board'
+
+        document.querySelector('#canvas').innerHTML = ''
         @svg = SVG().addTo('#canvas').size(100*@scale+2*@padding, 100*@scale+2*@padding)
+        do @draw_board_skeleton
 
     draw_board_skeleton: ->
         @slot_group = do @svg.group
@@ -21,17 +31,7 @@ window.canvas =
             .fill color
             .remember 'color', color
 
-    reset: (board_type='standard') ->
-        switch board_type
-            when 'tiny' then @board = TinyBoard
-            when 'small' then @board = SmallBoard
-            when 'standard' then @board = StandardBoard
-            when 'large' then @board = LargeBoard
-            when 'huge' then @board = HugeBoard
-            else return console.error 'unknown board'
-
-        @slots = do @draw_board_skeleton
-
+    reset: ->
         [self_slots, oppo_slots] = @board.base_ids
         for slot in @slots
             switch

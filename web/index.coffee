@@ -16,12 +16,5 @@ window.replay = (records) ->
         .appendChild button
 
 do ->
-    await Promise.all [
-        do api.init
-        do pvp.init
-    ]
-
-    do canvas.init
-    canvas.reset 'small'
-
+    await Promise.all window.ready
 

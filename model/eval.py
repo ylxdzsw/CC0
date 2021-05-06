@@ -34,7 +34,7 @@ while True:
 
     mcts.playout(game, 8000 - mcts.total_visits())
     value = mcts.root_value()
-    old_pos, new_pos = mcts.sample_action(0, 1)
+    old_pos, new_pos = mcts.sample_action(0, 0.1)
 
     print("move from {} to {}. value: {}".format(old_pos, new_pos, value))
 

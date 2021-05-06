@@ -35,7 +35,7 @@ def self_play(board_type, model):
 
         mcts.playout(game, 800 - mcts.total_visits())
 
-        action_probs = mcts.get_action_probs(1e-3)
+        action_probs = mcts.get_action_probs(0.1)
         pieces, mask, probs = encode_input(game, action_probs)
 
         data.append((pieces, mask, probs))
@@ -44,7 +44,7 @@ def self_play(board_type, model):
         # value = mcts.root_value()
         # print(state, action_probs, value)
 
-        old_pos, new_pos = mcts.sample_action(0.2, 0.1) # the temperature used for self-play is not the same as for collecting trace
+        old_pos, new_pos = mcts.sample_action(0.2, 0.1)
         game.do_move(old_pos, new_pos)
         mcts.chroot(old_pos, new_pos)
 

@@ -9,6 +9,7 @@
 
 <script> // TODO: serve from network
 window.cc0_base64 = "[wasm]"
+window.ready = [eval] "[]"
 </script>
 
 [wasm]= read("cc0.wasm", 'base64')
