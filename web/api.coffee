@@ -1,5 +1,5 @@
 window.ready.push do ->
-    libcc0 = await do ->
+    window.libcc0 = await do ->
         bytes = atob window.cc0_base64
         buffer = Uint8Array.from bytes, (c) -> c.charCodeAt 0
         WebAssembly.instantiate buffer, {}
@@ -22,11 +22,11 @@ window.ready.push do ->
                 when "standard"
                     @ptr = libcc0.new_standard_game()
                     do reclaim_game_ptr
-                    game_ptr_refs.push({ ref: WeakRef(this), ptr: @ptr })
+                    game_ptr_refs.push({ ref: new WeakRef @, ptr: @ptr })
                 when "small"
                     @ptr = libcc0.new_small_game()
                     do reclaim_game_ptr
-                    game_ptr_refs.push({ ref: WeakRef(this), ptr: @ptr })
+                    game_ptr_refs.push({ ref: new WeakRef @, ptr: @ptr })
                 else # construct directly with ptr
                     @ptr = board_type
                     # the ptr is owned by another instance.
@@ -43,6 +43,29 @@ window.ready.push do ->
         do_move: (old_pos, new_pos) ->
             libcc0.do_move(@ptr, old_pos, new_pos)
 
+        get_all_possible_paths: ->
+
+        dump: ->
+            ptr_buffer_ptr = libcc0.alloc_memory 12n # 4 bytes for buffer pointer (wasm32 is always 32 bit), and 8 bytes for size
+
+            libcc0.dump(@ptr, ptr_buffer_ptr, ptr_buffer_ptr + 4)
+
+            size = (new BigUint64Array libcc0.memory.buffer.slice ptr_buffer_ptr + 4, ptr_buffer_ptr + 12)[0]
+            buffer_ptr = (new Uint32Array libcc0.memory.buffer.slice ptr_buffer_ptr, ptr_buffer_ptr + 4)[0]
+            buffer = new Uint8Array libcc0.memory.buffer, buffer_ptr, Number size
+
+            n_pieces = Number(buffer[0])
+            current_player = Number(buffer[1])
+            first_players_pieces = for i in [0...n_pieces]
+                buffer[i+2]
+            second_players_pieces = for i in [0...n_pieces]
+                buffer[i+2+n_pieces]
+
+            libcc0.free_memory(ptr_buffer_ptr, 12n)
+            libcc0.free_memory(buffer_ptr, size)
+
+            { current_player, first_players_pieces, second_players_pieces }
+
         # 1: first player won, 2: second player won, 3: tie, 0: unfinished.
         get_status: ->
             libcc0.get_status(@ptr)
@@ -50,11 +73,3 @@ window.ready.push do ->
     window.MCTS = class
         constructor: () ->
 
-    # m = solver.alloc_memory 4n
-    # m = new Uint8Array solver.memory.buffer, m, 4
-    # m.set [15, 15, 15, 15]
-    # r = solver.algorithm_x m.byteOffset, 4n
-    # r = new Uint8Array solver.memory.buffer, r, 3
-    # console.log r
-    # solver.free_memory(m.byteOffset, 4n)
-    # solver.free_memory(r.byteOffset, 3n)

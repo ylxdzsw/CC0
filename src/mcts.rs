@@ -17,11 +17,11 @@ fn get_random_number() -> u32 {
     }
 }
 
-fn get_random_float() -> f64 {
-    get_random_number() as f64 / core::u32::MAX as f64
+fn get_random_float() -> f32 {
+    get_random_number() as f32 / core::u32::MAX as f32
 }
 
-fn sample_categorical(probs: impl Iterator<Item=f64>) -> usize {
+fn sample_categorical(probs: impl Iterator<Item=f32>) -> usize {
     let mut rand = get_random_float();
     for (i, p) in probs.enumerate() {
         if rand < p as _ {
@@ -37,16 +37,16 @@ fn uniform_random_choice<T>(x: &[T]) -> &T {
     &x[get_random_number() as usize % x.len()]
 }
 
-fn softmax(x: &mut [f64], temp: f64) {
+fn softmax(x: &mut [f32], temp: f32) {
     x.iter_mut().for_each(|v| *v = *v / temp);
     let m = x.iter().map(|v| OrderedFloat(*v)).max().unwrap().into_inner();
-    let s: f64 = x.iter().map(|v| (*v - m).exp()).sum();
+    let s: f32 = x.iter().map(|v| (*v - m).exp()).sum();
     x.iter_mut().for_each(|v| *v = (*v - m - s.ln()).exp());
 }
 
 pub type Action = (Position, Position); // from, to
-pub type ActionProb = (Position, Position, f64); // from, to, prob
-pub type PolicyValueCallback = dyn Fn(&Game) -> (Vec<ActionProb>, f64);
+pub type ActionProb = (Position, Position, f32); // from, to, prob
+pub type PolicyValueCallback = dyn Fn(&Game) -> (Vec<ActionProb>, f32);
 
 // A parent node holds the ownership of it children. For simplicity and unsafe-free, the child node do not hold
 // reference to its parent. Therefore the traveling methods must be recursive and save the path on stack.
@@ -54,19 +54,19 @@ struct Node {
     action: Action,
     player: Player, // who plays the action
     children: Vec<Node>,
-    n_visits: u64,
-    q: f64,
-    p: f64
+    n_visits: u32,
+    q: f32,
+    p: f32
 }
 
 impl Node {
-    fn new(action: Action, player: Player, p: f64) -> Self {
+    fn new(action: Action, player: Player, p: f32) -> Self {
         Self { action, player, children: vec![], n_visits: 0, q: 0., p }
     }
 
     /// playout a game and update the path, return the leaf_value for the parent
     // Note about leaf_value: the leaf_value applied to a node should be large if the action of the node is favorable for the last player (it is the `player` of the node)
-    fn playout_and_update_recursive(&mut self, mut game: Game, policy: Option<&PolicyValueCallback>) -> f64 {
+    fn playout_and_update_recursive(&mut self, mut game: Game, policy: Option<&PolicyValueCallback>) -> f32 {
         if self.is_leaf() {
             let leaf_value = match game.status() {
                 Status::Winner(winner) => {
@@ -106,16 +106,16 @@ impl Node {
     }
 
     // unlike UCB in most MCTS, AlphaZero uses a variant called PUCT.
-    fn puct(&self, pvisit: u64) -> f64 {
+    fn puct(&self, pvisit: u32) -> f32 {
         #[allow(non_upper_case_globals)]
-        const c_puct: f64 = 2.;
-        let u = c_puct * self.p * (pvisit as f64).sqrt() / (1. + self.n_visits as f64);
+        const c_puct: f32 = 2.;
+        let u = c_puct * self.p * (pvisit as f32).sqrt() / (1. + self.n_visits as f32);
         self.q + u
     }
 
-    fn update(&mut self, leaf_value: f64) {
+    fn update(&mut self, leaf_value: f32) {
         self.n_visits += 1;
-        self.q += (leaf_value - self.q) / self.n_visits as f64
+        self.q += (leaf_value - self.q) / self.n_visits as f32
     }
 
     fn expand(&mut self, game: &Game, action_probs: &[ActionProb]) {
@@ -131,13 +131,13 @@ impl Node {
             }
         }
 
-        let p = 1. / self.children.len() as f64;
+        let p = 1. / self.children.len() as f32;
         for child in self.children.iter_mut() {
             child.p = p
         }
     }
 
-    fn rollout(&self, mut game: Game) -> f64 {
+    fn rollout(&self, mut game: Game) -> f32 {
         while !game.status().finished() {
             let all_valid_moves = game.movable_pieces_and_possible_moves_of_current_player();
             let (from, moves) = uniform_random_choice(&all_valid_moves);
@@ -171,9 +171,9 @@ impl Tree {
         }
     }
 
-    pub fn get_action_probs(&self, temp: f64) -> Vec<ActionProb> { // from, to, prob
+    pub fn get_action_probs(&self, temp: f32) -> Vec<ActionProb> { // from, to, prob
         debug_assert!(!self.root.children.is_empty());
-        let mut visits: Vec<f64> = self.root.children.iter().map(|node| node.n_visits as _).collect();
+        let mut visits: Vec<f32> = self.root.children.iter().map(|node| node.n_visits as _).collect();
         for v in visits.iter_mut() {
             *v = (*v + 1e-10).ln()
         }
@@ -193,7 +193,7 @@ impl Tree {
     // sample an action using the root visit counts.
     // exploration_prob: 0 in inference, 0.1 in self-play
     // temperature: 1e-3 in inference, 0.1 in self-play
-    pub fn sample_action(&mut self, exploration_prob: f64, temperature: f64) -> Action {
+    pub fn sample_action(&mut self, exploration_prob: f32, temperature: f32) -> Action {
         // let mut children: Vec<_> = self.root.children.iter().map(|c| (c.action, c.n_visits, c.q)).collect();
         // children.sort_by_key(|x| OrderedFloat(-x.2));
         // for i in 0..5 {
@@ -213,11 +213,11 @@ impl Tree {
         (sampled_act.0, sampled_act.1)
     }
 
-    pub fn total_visits(&self) -> u64 {
+    pub fn total_visits(&self) -> u32 {
         return self.root.n_visits
     }
 
-    pub fn root_value(&self) -> f64 {
+    pub fn root_value(&self) -> f32 {
         return self.root.q
     }
 }

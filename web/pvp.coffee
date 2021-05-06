@@ -2,7 +2,7 @@ window.ready.push do ->
     self_id = Math.floor Math.random() * 1000000
 
     document.querySelector '#self-id'
-        .textContent = "My id: #{@self_id}"
+        .textContent = "My id: #{self_id}"
 
     conn = null
 

@@ -4,10 +4,10 @@ libcc0 = ctypes.cdll.LoadLibrary("../target/release/libcc0.so")
 
 INVALID_POSITION = ctypes.c_uint8.in_dll(libcc0, "INVALID_POSITION").value
 
-libcc0.alloc_memory.argtypes = [ctypes.c_uint64]
+libcc0.alloc_memory.argtypes = [ctypes.c_uint32]
 libcc0.alloc_memory.restype = ctypes.POINTER(ctypes.c_uint8)
 
-libcc0.free_memory.argtypes = [ctypes.POINTER(ctypes.c_uint8), ctypes.c_uint64]
+libcc0.free_memory.argtypes = [ctypes.POINTER(ctypes.c_uint8), ctypes.c_uint32]
 libcc0.free_memory.restype = None
 
 libcc0.set_random_seed.argtypes = [ctypes.c_uint32]
@@ -20,12 +20,12 @@ libcc0.new_small_game.argtypes = []
 libcc0.new_small_game.restype = ctypes.c_void_p
 
 libcc0.get_board_size.argtypes = [ctypes.c_void_p]
-libcc0.get_board_size.restype = ctypes.c_uint64
+libcc0.get_board_size.restype = ctypes.c_uint32
 
 libcc0.get_n_pieces.argtypes = [ctypes.c_void_p]
-libcc0.get_n_pieces.restype = ctypes.c_uint64
+libcc0.get_n_pieces.restype = ctypes.c_uint32
 
-libcc0.all_possible_moves.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.POINTER(ctypes.c_uint8)), ctypes.POINTER(ctypes.c_uint64)]
+libcc0.all_possible_moves.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.POINTER(ctypes.c_uint8)), ctypes.POINTER(ctypes.c_uint32)]
 libcc0.all_possible_moves.restype = None
 
 libcc0.do_move.argtypes = [ctypes.c_void_p, ctypes.c_uint8, ctypes.c_uint8]
@@ -34,32 +34,32 @@ libcc0.do_move.restype = None
 libcc0.get_status.argtypes = [ctypes.c_void_p]
 libcc0.get_status.restype = ctypes.c_uint8
 
-libcc0.dump.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.POINTER(ctypes.c_uint8)), ctypes.POINTER(ctypes.c_uint64)]
+libcc0.dump.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.POINTER(ctypes.c_uint8)), ctypes.POINTER(ctypes.c_uint32)]
 libcc0.dump.restype = None
 
 libcc0.destroy_game.argtypes = [ctypes.c_void_p]
 libcc0.destroy_game.restype = None
 
-libcc0.new_mcts.argtypes = [ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double))]
+libcc0.new_mcts.argtypes = [ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float))]
 libcc0.new_mcts.restype = ctypes.c_void_p
 
-libcc0.mcts_playout.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint64]
+libcc0.mcts_playout.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint32]
 libcc0.mcts_playout.restype = None
 
-libcc0.mcts_get_action_probs.argtypes = [ctypes.c_void_p, ctypes.c_double, ctypes.POINTER(ctypes.c_uint64), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_uint64)]
+libcc0.mcts_get_action_probs.argtypes = [ctypes.c_void_p, ctypes.c_float, ctypes.POINTER(ctypes.c_uint32), ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_uint32)]
 libcc0.mcts_get_action_probs.restype = None
 
-libcc0.mcts_sample_action.argtypes = [ctypes.c_void_p, ctypes.c_double, ctypes.c_double]
-libcc0.mcts_sample_action.restype = ctypes.c_uint64
+libcc0.mcts_sample_action.argtypes = [ctypes.c_void_p, ctypes.c_float, ctypes.c_float]
+libcc0.mcts_sample_action.restype = ctypes.c_uint32
 
-libcc0.mcts_chroot.argtypes = [ctypes.c_void_p, ctypes.c_uint64]
+libcc0.mcts_chroot.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
 libcc0.mcts_chroot.restype = None
 
 libcc0.mcts_total_visits.argtypes = [ctypes.c_void_p]
-libcc0.mcts_total_visits.restype = ctypes.c_uint64
+libcc0.mcts_total_visits.restype = ctypes.c_uint32
 
 libcc0.mcts_root_value.argtypes = [ctypes.c_void_p]
-libcc0.mcts_root_value.restype = ctypes.c_double
+libcc0.mcts_root_value.restype = ctypes.c_float
 
 libcc0.destroy_mcts.argtypes = [ctypes.c_void_p]
 libcc0.destroy_mcts.restype = None
@@ -93,7 +93,7 @@ class Game:
 
     def all_possible_moves(self):
         buffer_ptr = ctypes.POINTER(ctypes.c_uint8)()
-        size = ctypes.c_uint64(0)
+        size = ctypes.c_uint32(0)
         libcc0.all_possible_moves(self.ptr, ctypes.byref(buffer_ptr), ctypes.byref(size))
 
         possible_moves = []
@@ -125,7 +125,7 @@ class Game:
     # return (player, first player's pieces' positions, second player's pieces' positions)
     def dump(self):
         buffer_ptr = ctypes.POINTER(ctypes.c_uint8)()
-        size = ctypes.c_uint64(0)
+        size = ctypes.c_uint32(0)
         libcc0.dump(self.ptr, ctypes.byref(buffer_ptr), ctypes.byref(size))
 
         n_pieces = buffer_ptr[0]
@@ -143,7 +143,7 @@ class Game:
 
 class MCTS:
     def __init__(self, policy_fun):
-        @ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double))
+        @ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float))
         def _policy_fun(game_ptr, prior_out, value_out):
             game = Game(game_ptr)
             prior_logsoftmax, value = policy_fun(game)
@@ -160,11 +160,11 @@ class MCTS:
         libcc0.mcts_playout(self.ptr, game.ptr, ntimes)
 
     def get_action_probs(self, temp=1e-3):
-        length = ctypes.c_uint64(0)
+        length = ctypes.c_uint32(0)
         libcc0.mcts_get_action_probs(self.ptr, temp, None, None, ctypes.byref(length))
 
-        actions_buffer = (ctypes.c_uint64 * length.value)()
-        probs_buffer = (ctypes.c_double * length.value)()
+        actions_buffer = (ctypes.c_uint32 * length.value)()
+        probs_buffer = (ctypes.c_float * length.value)()
 
         libcc0.mcts_get_action_probs(self.ptr, temp, actions_buffer, probs_buffer, ctypes.byref(length))
         return [ (*decode_action(actions_buffer[i]), probs_buffer[i]) for i in range(length.value) ]

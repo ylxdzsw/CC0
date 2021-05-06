@@ -14,13 +14,12 @@ window.ready = [eval] "[]"
 
 [wasm]= read("cc0.wasm", 'base64')
 
+[require](index.html)
+[require](index.less)
 [require](api.coffee)
 [require](board.coffee)
 [require](canvas.coffee)
 [require](pvp.coffee)
-
-[require](index.html)
-[require](index.less)
 [require](index.coffee)
 
 [mixin] @std/common.ymd
