@@ -1,7 +1,6 @@
 window.canvas =
     init: (@scale=4, @padding=10) ->
         @svg = SVG().addTo('#canvas').size(100*@scale+2*@padding, 100*@scale+2*@padding)
-        # @slots = do @draw_board_skeleton
 
     draw_board_skeleton: ->
         @slot_group = do @svg.group
@@ -30,6 +29,8 @@ window.canvas =
             when 'large' then @board = LargeBoard
             when 'huge' then @board = HugeBoard
             else return console.error 'unknown board'
+
+        @slots = do @draw_board_skeleton
 
         [self_slots, oppo_slots] = @board.base_ids
         for slot in @slots

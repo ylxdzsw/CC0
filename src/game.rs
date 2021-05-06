@@ -169,18 +169,36 @@ impl Game {
         self.pindex[to as usize] = Some(pid);
     }
 
+    // the winning rule is slightly changed a bit:
+    // 1. the player that first puts all its pieces into the opponents base wins
+    // 2. if a player did not move all its pieces out in 2*n_pieces moves, it loss.
+    // 3. if the game did not end in
     pub fn status(&self) -> Status {
-        let mut w1 = 0;
-        let mut w2 = 0;
+        let (mut w1, mut w2, mut l1, mut l2) = (0, 0, 0, 0);
         for p in &self.pieces {
-            if p.owner == Player::First && self.board_def.base_ids().1.contains(&p.position) { w1 += 1; }
+            if p.owner == Player::First  && self.board_def.base_ids().1.contains(&p.position) { w1 += 1; }
+            if p.owner == Player::First  && self.board_def.base_ids().0.contains(&p.position) { l1 += 1; }
             if p.owner == Player::Second && self.board_def.base_ids().0.contains(&p.position) { w2 += 1; }
+            if p.owner == Player::Second && self.board_def.base_ids().1.contains(&p.position) { l2 += 1; }
         }
+
         if w1 == self.board_def.n_pieces() {
-            Status::Winner(Player::First)
-        } else if w2 == self.board_def.n_pieces() {
-            Status::Winner(Player::Second)
-        } else if self.total_moves >= 2 * self.board_def.turn_limit() {
+            return Status::Winner(Player::First)
+        }
+
+        if w2 == self.board_def.n_pieces() {
+            return Status::Winner(Player::Second)
+        }
+
+        if self.total_moves >= 2 * self.board_def.empty_turn_limit() - 1 && l1 > 0 {
+            return Status::Winner(Player::Second)
+        }
+
+        if self.total_moves >= 2 * self.board_def.empty_turn_limit() && l2 > 0 {
+            return Status::Winner(Player::First)
+        }
+
+        if self.total_moves >= 2 * self.board_def.turn_limit() {
             match w1.cmp(&w2) {
                 core::cmp::Ordering::Less => Status::Winner(Player::Second),
                 core::cmp::Ordering::Equal => Status::Tie,

@@ -44,7 +44,7 @@ def self_play(board_type, model):
         # value = mcts.root_value()
         # print(state, action_probs, value)
 
-        old_pos, new_pos = mcts.sample_action(0.1, 0.1) # the temperature used for self-play is not the same as for collecting trace
+        old_pos, new_pos = mcts.sample_action(0.2, 0.1) # the temperature used for self-play is not the same as for collecting trace
         game.do_move(old_pos, new_pos)
         mcts.chroot(old_pos, new_pos)
 
@@ -114,19 +114,21 @@ if __name__ == '__main__':
         r += 1
 
         try:
-            data = load("data_{}".format(r))
+            data = load("data_{:03}".format(r))
         except:
             print("collecting data")
             data = collect_self_play_data(model, 100)
-            save(data, "data_{}".format(r))
+            save(data, "data_{:03}".format(r))
 
         print("load last 5 rounds data")
         for i in range(r-5, r):
-            if i < 0:
-                continue
-            data.extend(load("data_{}".format(i)))
+            try:
+                data.extend(load("data_{:03}".format(i)))
+            except:
+                print("skip data_{:03}".format(i))
+                pass
 
         print("training model")
         # model.cuda()
         train(model, optimizer, data)
-        save({ 'r': r, 'model_state_dict': model.state_dict(), 'optimizer_state_dict': optimizer.state_dict() }, "model_{}".format(r))
+        save({ 'r': r, 'model_state_dict': model.state_dict(), 'optimizer_state_dict': optimizer.state_dict() }, "model_{:03}".format(r))
