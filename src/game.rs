@@ -92,10 +92,11 @@ impl Game {
 
     /// find possible moves of p by BFS. result[i] = j means p can move to i via j. INVALID_POSITION means unreachable.
     pub fn possible_moves_with_path(&self, pos: Position) -> Vec<Position> {
-        let p = &self.pieces[self.pindex[pos as usize].unwrap()];
+        let moving_piece_id = self.pindex[pos as usize].unwrap();
+        let moving_piece_pos = self.pieces[moving_piece_id].position;
         let mut result = vec![INVALID_POSITION; self.board_def.board_size()];
-        let mut queue = vec![p.position];
-        result[p.position as usize] = p.position;
+        let mut queue = vec![moving_piece_pos];
+        result[moving_piece_pos as usize] = moving_piece_pos;
 
         while let Some(pos) = queue.pop() {
             for direction in 0..6 {
@@ -110,9 +111,9 @@ impl Game {
                     }
 
                     match (&self.pindex[cp as usize], hopping_started, steps) {
-                        (Some(_), true, _) => break, // encounter obstacle, stop
-                        (Some(_), false, _) => hopping_started = true, // start hopping
-                        (None, true, 0) => { // hopping succeed
+                        (Some(pid), true, _) if *pid != moving_piece_id => break, // encounter obstacle, stop
+                        (Some(pid), false, _) if *pid != moving_piece_id => hopping_started = true, // start hopping
+                        (_, true, 0) => { // hopping succeed
                             if result[cp as usize] != INVALID_POSITION { // can be reached by another (shorter) path
                                 break
                             }
@@ -120,8 +121,8 @@ impl Game {
                             result[cp as usize] = pos;
                             break
                         }
-                        (None, true, _) => steps -= 1, // hopping continue
-                        (None, false, _) => steps += 1, // continue to move
+                        (_, true, _) => steps -= 1, // hopping continue
+                        (_, false, _) => steps += 1, // continue to move
                     }
                 }
             }
@@ -129,12 +130,12 @@ impl Game {
 
         // append single moves
         for direction in 0..6 {
-            let next = self.board_def.adj(p.position)[direction];
+            let next = self.board_def.adj(moving_piece_pos)[direction];
             if next == INVALID_POSITION || self.pindex[next as usize].is_some() {
                 continue
             }
 
-            result[next as usize] = p.position; // overide if exist because this must be the shortest
+            result[next as usize] = moving_piece_pos; // overide if exist because this must be the shortest
         }
 
         result
