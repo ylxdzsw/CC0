@@ -6,6 +6,7 @@ package-lock.json
 node_modules
 dist
 *.wasm
+*.onnx
 data
 data_*
 model_*

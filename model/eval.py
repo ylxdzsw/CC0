@@ -7,7 +7,7 @@ from model import Model, encode_input
 import sys
 
 checkpoint = load(sys.argv[1])
-model = torch.jit.script(Model(73))
+model = torch.jit.script(Model(121, 10))
 model.load_state_dict(checkpoint['model_state_dict'])
 model.cpu().eval()
 @torch.no_grad()

@@ -1,16 +1,41 @@
-<button id="pure_mcts">pure mcts</button>
-<button id="hotseat">hotseat</button>
-<label for="board-type">Board Type</label>
-<select id="board-type">
-    <option value="tiny">Tiny</option>
-    <option value="small">Small</option>
-    <option value="standard" selected>Standard</option>
-    <option value="large">Large</option>
-    <option value="huge">Huge</option>
-</select>
-<div id="self-id"></div>
-<label for="peer-id">Conntect to </label>
-<input type="text" id="peer-id"></input>
+<div id="status"></div>
 <button id="connect-peer">Connect</button>
+<button id="new-game-button">New Game</button>
+
+<div id="new-game-dialog" class="popup hidden">
+    <div id="new-game-dialog-opponent-radio">
+        <input type="radio" id="new-game-dialog-opponent-radio-hot-seat" name="opponent" value="hot-seat">
+        <label for="new-game-dialog-opponent-radio-hot-seat">Hot Seat</label>
+
+        <input type="radio" id="new-game-dialog-opponent-radio-pure-mcts" name="opponent" value="pure-mcts">
+        <label for="new-game-dialog-opponent-radio-hot-seat">Pure MCTS</label>
+
+        <input type="radio" id="new-game-dialog-opponent-radio-alpha-zero" name="opponent" value="alpha-zero">
+        <label for="new-game-dialog-opponent-radio-hot-seat">Alpha Zero</label>
+
+        <input type="radio" id="new-game-dialog-opponent-radio-peer" name="opponent" value="peer">
+        <label for="new-game-dialog-opponent-radio-hot-seat">Peer</label>
+    </div>
+
+    <label for="board-type">Board Type</label>
+    <select id="board-type">
+        <option value="tiny">Tiny</option>
+        <option value="small">Small</option>
+        <option value="standard" selected>Standard</option>
+        <option value="large">Large</option>
+        <option value="huge">Huge</option>
+    </select>
+</div>
+
+<div id="connect-dialog" class="popup hidden">
+    <input type="text" id="connect-dialog-peer-id"></input>
+
+</div>
+
+<div id="incoming-dialog" class="popup hidden">
+
+</div>
 
 <div id="canvas"></div>
+
+<div id="log"></div>

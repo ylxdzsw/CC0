@@ -65,7 +65,7 @@ def worker_run(board_type):
 def collect_self_play_data(model, n=1000):
     model.cpu().save('scripted_model.pt')
     with Pool(8, initializer=worker_init, initargs=('scripted_model.pt',)) as pool:
-        data_batches = pool.map(worker_run, ('small' for _ in range(n)))
+        data_batches = pool.map(worker_run, ('standard' for _ in range(n)))
     return [ x for batch in data_batches for x in batch ]
 
 def random_batch(data, batch_size):
@@ -75,7 +75,7 @@ def train(model, optimizer, data):
     model.train()
 
     acc = 0, 0
-    for epoch in range(2000):
+    for epoch in range(len(data) // 4):
         # pieces, masks, probs, scores = ( torch.from_numpy(x).cuda() for x in random_batch(data, 32) )
         pieces, masks, probs, scores = ( torch.from_numpy(x) for x in random_batch(data, 32) )
         policy, value = model(pieces, masks)
@@ -98,7 +98,7 @@ def evaluate():
 if __name__ == '__main__':
     import sys
 
-    model = torch.jit.script(Model(73))
+    model = torch.jit.script(Model(121, 10))
     optimizer = torch.optim.Adam(model.parameters(), lr=2e-5, weight_decay=1e-6)
     r = -1
 
