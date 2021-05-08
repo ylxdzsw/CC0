@@ -9,8 +9,10 @@ html, body {
 }
 
 body {
+    position: relative;
     width: 515px;
     margin: 60px auto;
+    min-height: 650px;
 }
 
 p {
@@ -24,15 +26,11 @@ a {
     cursor: pointer;
 }
 
-#heading {
-    line-height: 40px;
-}
-
-.button {
-    display: inline-block;
+.top-button {
+    position: absolute;
     background: #8f7a66;
     border: none;
-    border-radius: 3px;
+    border-radius: 6px;
     padding: 0 20px;
     text-align: center;
     text-decoration: none;
@@ -42,27 +40,27 @@ a {
     cursor: pointer;
 }
 
-#new-game-offline, #new-game-online {
-    margin-left: 16px;
-    float: right;
+#connect-peer-button {
+    top: 40px;
+    right: 125px;
+    width: 100px;
 }
 
-#game {
-    margin: 40px auto;
-    position: relative;
+#new-game-button {
+    top: 40px;
+    right: 0;
+    width: 110px;
+}
+
+
+#canvas {
+    top: 120px;
+    position: absolute;
     background: #bbada0;
     border-radius: 6px;
     width: 515px;
     height: 515px;
     box-sizing: border-box;
-}
-
-.cell {
-    position: absolute;
-    width: 110px;
-    height: 110px;
-    border-radius: 3px;
-    background: rgba(238, 228, 218, 0.35);
 }
 
 @keyframes fade-in {

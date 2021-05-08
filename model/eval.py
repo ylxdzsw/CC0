@@ -18,7 +18,7 @@ def policy_fun(game):
     policy, value = model(pieces, mask)
     return torch.squeeze(policy, 0), torch.squeeze(value, 0)
 
-game = Game("small")
+game = Game("standard")
 mcts = MCTS(policy_fun)
 
 while True:

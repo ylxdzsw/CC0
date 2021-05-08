@@ -1,9 +1,7 @@
 window.ready.push do ->
-    window.libcc0 = await do ->
-        bytes = atob window.cc0_base64
-        buffer = Uint8Array.from bytes, (c) -> c.charCodeAt 0
-        WebAssembly.instantiate buffer, {}
-            .then (x) => x.instance.exports
+    wasm = await WebAssembly.instantiateStreaming (fetch "cc0.wasm"), {}
+
+    window.libcc0 = wasm.instance.exports
 
     window.INVALID_POSITION = (new Uint8Array libcc0.memory.buffer, libcc0.INVALID_POSITION, 1)[0]
 

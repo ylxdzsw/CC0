@@ -65,7 +65,7 @@ def worker_run(board_type):
 def collect_self_play_data(model, n=1000):
     model.cpu().save('scripted_model.pt')
     with Pool(8, initializer=worker_init, initargs=('scripted_model.pt',)) as pool:
-        data_batches = pool.map(worker_run, ('standard' for _ in range(n)))
+        data_batches = pool.map(worker_run, ('standard' for _ in range(n)), chunksize=1)
     return [ x for batch in data_batches for x in batch ]
 
 def random_batch(data, batch_size):
