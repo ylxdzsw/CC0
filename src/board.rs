@@ -8,13 +8,8 @@ pub trait Board {
     fn n_pieces(&self) -> usize {
         (1..=self.rank()).sum()
     }
-    // the number of moves that each player must move all its pieces out
-    fn empty_turn_limit(&self) -> usize {
-        self.n_pieces() * 2
-    }
-    // the number of moves that each player can play before a forced end
     fn turn_limit(&self) -> usize {
-        self.n_pieces() * 4
+        self.n_pieces() * 5
     }
     fn adj(&self, center: Position) -> &'static [Position];
     fn base_ids(&self) -> (&'static [Position], &'static [Position]);

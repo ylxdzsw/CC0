@@ -170,40 +170,37 @@ impl Game {
         self.pindex[to as usize] = Some(pid);
     }
 
-    // the winning rule is slightly changed a bit:
-    // 1. the player that first puts all its pieces into the opponents base wins
-    // 2. if a player did not move all its pieces out in 2*n_pieces moves, it loss.
-    // 3. if the game did not end in
+    // the winning rule is slightly changed a bit for effective training:
+    // 1. After the first turn of each player, the player whose base gets filled (with both player's pieces) loss immediately
+    // 2. When the turn limits reached (defaults to 5 * n_pieces), the player whose base have less pieces win.
+    // This is due to the following observations:
+    // 1. If we use the simplest rule, that moving all pieces to the opponent's base, pure MCTS never reach an end and the training cannot start.
+    // 2. The second method I tried is to force an end when turn limit reached. The player that put most pieces to the opponent's base win.
+    //   - It looks compatiable to the original rule. However, after training the agents become "defensive" that when a player is going to lose, it will return a piece back to its own base so that the opponent cannot move in, force the game to end in tie.
     pub fn status(&self) -> Status {
-        let (mut w1, mut w2, mut l1, mut l2) = (0, 0, 0, 0);
+        if self.total_moves < 2 {
+            return Status::Unfinished
+        }
+
+        let (mut n_pieces_in_first_player_base, mut n_pieces_in_second_player_base) = (0, 0);
         for p in &self.pieces {
-            if p.owner == Player::First  && self.board_def.base_ids().1.contains(&p.position) { w1 += 1; }
-            if p.owner == Player::First  && self.board_def.base_ids().0.contains(&p.position) { l1 += 1; }
-            if p.owner == Player::Second && self.board_def.base_ids().0.contains(&p.position) { w2 += 1; }
-            if p.owner == Player::Second && self.board_def.base_ids().1.contains(&p.position) { l2 += 1; }
+            if self.board_def.base_ids().0.contains(&p.position) { n_pieces_in_first_player_base += 1; }
+            if self.board_def.base_ids().1.contains(&p.position) { n_pieces_in_second_player_base += 1; }
         }
 
-        if w1 == self.board_def.n_pieces() {
-            return Status::Winner(Player::First)
-        }
-
-        if w2 == self.board_def.n_pieces() {
+        if n_pieces_in_first_player_base == self.board_def.n_pieces() {
             return Status::Winner(Player::Second)
         }
 
-        if self.total_moves >= 2 * self.board_def.empty_turn_limit() - 1 && l1 > 0 {
-            return Status::Winner(Player::Second)
-        }
-
-        if self.total_moves >= 2 * self.board_def.empty_turn_limit() && l2 > 0 {
+        if n_pieces_in_second_player_base == self.board_def.n_pieces() {
             return Status::Winner(Player::First)
         }
 
         if self.total_moves >= 2 * self.board_def.turn_limit() {
-            match w1.cmp(&w2) {
-                core::cmp::Ordering::Less => Status::Winner(Player::Second),
+            match n_pieces_in_first_player_base.cmp(&n_pieces_in_second_player_base) {
+                core::cmp::Ordering::Less => Status::Winner(Player::First),
                 core::cmp::Ordering::Equal => Status::Tie,
-                core::cmp::Ordering::Greater => Status::Winner(Player::First)
+                core::cmp::Ordering::Greater => Status::Winner(Player::Second)
             }
         } else {
             Status::Unfinished
