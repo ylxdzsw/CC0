@@ -62,10 +62,10 @@ def worker_run(board_type):
 # inference performance: CUDA: 60 playouts/s, SingleThreadCPU: 80 playouts/s, MultiThreadCPU: 105 playouts/s but uses 40% of all 16 cores.
 # TorchScript jit further gives around 10% performance gain.
 # Therefore we choose to play multiple games concurrently, each use only one thread.
-def collect_self_play_data(model, n=1000):
+def collect_self_play_data(model, board_type="standard", n=1000):
     model.cpu().save('scripted_model.pt')
     with Pool(8, initializer=worker_init, initargs=('scripted_model.pt',)) as pool:
-        data_batches = pool.map(worker_run, ('standard' for _ in range(n)), chunksize=1)
+        data_batches = pool.map(worker_run, (board_type for _ in range(n)), chunksize=1)
     return [ x for batch in data_batches for x in batch ]
 
 def random_batch(data, batch_size):
@@ -92,18 +92,22 @@ def train(model, optimizer, data):
             print(*acc)
             acc = 0, 0
 
-def evaluate():
-    pass
-
+# The argument can be either a checkpoint, or the board type
 if __name__ == '__main__':
     import sys
 
-    model = torch.jit.script(Model(121, 10))
+    try:
+        checkpoint = load(sys.argv[1])
+        board_type = checkpoint["board_type"]
+    except:
+        board_type = sys.argv[1]
+
+    dummy_game = Game(board_type)
+    model = torch.jit.script(Model(dummy_game.board_size, dummy_game.n_pieces))
     optimizer = torch.optim.Adam(model.parameters(), lr=2e-5, weight_decay=1e-6)
     r = -1
 
     try:
-        checkpoint = load(sys.argv[1])
         model.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         r = checkpoint['r']
@@ -117,7 +121,7 @@ if __name__ == '__main__':
             data = load("data_{:03}".format(r))
         except:
             print("collecting data")
-            data = collect_self_play_data(model, 100)
+            data = collect_self_play_data(model, board_type, 100)
             save(data, "data_{:03}".format(r))
 
         print("load last 5 rounds data")
@@ -131,4 +135,4 @@ if __name__ == '__main__':
         print("training model")
         # model.cuda()
         train(model, optimizer, data)
-        save({ 'r': r, 'model_state_dict': model.state_dict(), 'optimizer_state_dict': optimizer.state_dict() }, "model_{:03}".format(r))
+        save({ 'r': r, 'board_type': board_type, 'model_state_dict': model.state_dict(), 'optimizer_state_dict': optimizer.state_dict() }, "model_{:03}".format(r))

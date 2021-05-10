@@ -7,9 +7,12 @@ from model import Model, encode_input
 import sys
 
 checkpoint = load(sys.argv[1])
-model = torch.jit.script(Model(121, 10))
+board_type = checkpoint['board_type']
+dummy_game = Game(board_type)
+model = torch.jit.script(Model(dummy_game.board_size, dummy_game.n_pieces))
 model.load_state_dict(checkpoint['model_state_dict'])
 model.cpu().eval()
+
 @torch.no_grad()
 def policy_fun(game):
     pieces, mask = encode_input(game)
@@ -18,7 +21,7 @@ def policy_fun(game):
     policy, value = model(pieces, mask)
     return torch.squeeze(policy, 0), torch.squeeze(value, 0)
 
-game = Game("standard")
+game = Game(board_type)
 mcts = MCTS(policy_fun)
 
 while True:

@@ -1,11 +1,16 @@
 import torch
 import numpy as np
+from api import Game, MCTS, set_random_seed
 from utils import save, load
 from model import Model, encode_input
 
+import sys
+
 # NOTE: scripted model cannot be exported to opset_7, which is the maximum version supported by onnx-js
-model = Model(121, 10)
 checkpoint = load(sys.argv[1])
+board_type = checkpoint['board_type']
+dummy_game = Game(board_type)
+model = Model(dummy_game.board_size, dummy_game.n_pieces)
 model.load_state_dict(checkpoint['model_state_dict'])
 r = checkpoint['r']
 
@@ -20,5 +25,5 @@ torch.onnx.export(
     opset_version=7,
     verbose=True,
     input_names=["pieces", "mask"],
-    output_names=["action_probs"]
+    output_names=["action_probs", "value"]
 )
