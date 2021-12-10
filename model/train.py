@@ -85,7 +85,6 @@ def train(model, optimizer, data):
         (policy_loss + value_loss).backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), .6)
         optimizer.step()
-        epoch += 1
 
         acc = acc[0] + policy_loss.item() / 100, acc[1] + value_loss.item() / 100
         if epoch % 100 == 99:
@@ -104,7 +103,7 @@ if __name__ == '__main__':
 
     dummy_game = Game(board_type)
     model = torch.jit.script(Model(dummy_game.board_size, dummy_game.n_pieces))
-    optimizer = torch.optim.Adam(model.parameters(), lr=2e-5, weight_decay=1e-6)
+    optimizer = torch.optim.Adam(model.parameters(), lr=2e-5, weight_decay=2e-6)
     r = -1
 
     try:

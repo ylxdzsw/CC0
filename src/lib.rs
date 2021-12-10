@@ -1,6 +1,8 @@
 // float point math (sqrt, ln) needs std
 // #![no_std]
 
+#![allow(clippy::missing_safety_doc)]
+
 #[macro_use]
 extern crate alloc;
 
@@ -110,6 +112,7 @@ pub unsafe extern fn get_status(game: *mut game::Game) -> u8 {
 /// 2nd byte: current player. 1 for the first player, 2 for the second.
 /// following 2*`n_pieces` bytes: the position of each pieces, with the first half belongs to the first player.
 /// the returned length is only used for deallocation. The `out` length is determined by 2 + 2 * n_pieces
+#[allow(clippy::vec_init_then_push)]
 #[no_mangle]
 pub unsafe extern fn dump(game: *mut game::Game, out: *mut *mut Position, length: *mut u32) {
     let game = &mut *game;

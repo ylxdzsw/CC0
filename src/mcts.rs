@@ -38,7 +38,7 @@ fn uniform_random_choice<T>(x: &[T]) -> &T {
 }
 
 fn softmax(x: &mut [f32], temp: f32) {
-    x.iter_mut().for_each(|v| *v = *v / temp);
+    x.iter_mut().for_each(|v| *v /= temp);
     let m = x.iter().map(|v| OrderedFloat(*v)).max().unwrap().into_inner();
     let s: f32 = x.iter().map(|v| (*v - m).exp()).sum();
     x.iter_mut().for_each(|v| *v = (*v - m - s.ln()).exp());
@@ -214,11 +214,11 @@ impl Tree {
     }
 
     pub fn total_visits(&self) -> u32 {
-        return self.root.n_visits
+        self.root.n_visits
     }
 
     pub fn root_value(&self) -> f32 {
-        return self.root.q
+        self.root.q
     }
 }
 
