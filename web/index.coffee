@@ -1,7 +1,37 @@
+class PlayerMenuItem
+    @next_id: 0
+    constructor: (@name, @agent) ->
+        @id = PlayerMenuItem.next_id++
+
+window.player_menu =
+    items: []
+    add: (name, agent) ->
+        item = new PlayerMenuItem name, agent
+        @items.push item
+        for i in [0...2]
+            option = document.createElement 'option'
+            option.setAttribute 'value', "i#{item.id}"
+            option.textContent = name
+            document.querySelector "player-#{i}"
+                .appendChild option
+    remove: (id) ->
+        @items = @items.filter (x) -> x.id isnt id
+        document.querySelectorAll "#player-1 option[value=\"i#{id}\"]"
+
+class LocalPlayer
+    get_next_action: ->
+
+
 window.app =
     init: ->
-        @game = new Game 'small'
-        canvas.init 'small'
+        player_menu.add 'Local Player',
+
+        document.querySelector '#new-game-button'
+            .addEventListener 'click', => @new_game_click
+
+    new_game_click: ->
+        @game = new Game 'standard'
+        canvas.init 'standard'
         do canvas.reset
 
     click: (pos) ->

@@ -1,6 +1,25 @@
-<div id="status"></div>
-<button id="connect-peer-button" class="top-button">Connect</button>
-<button id="new-game-button" class="top-button">New Game</button>
+<div id="top-pannel">
+    <div id="self-id"></div>
+    <div id="board-selection">
+        <label for="board-type">Board Type: </label>
+        <select id="board-type">
+            <option value="tiny">Tiny</option>
+            <option value="small">Small</option>
+            <option value="standard" selected>Standard</option>
+            <option value="large">Large</option>
+            <option value="huge">Huge</option>
+        </select>
+    </div>
+
+    <div id="player-menu">
+        <label for="palyer-1">Player 1: </label>
+        <select id="palyer-1"></select>
+        <label for="palyer-2">Player 2: </label>
+        <select id="palyer-2"></select>
+    </div>
+
+    <button id="new-game-button">New Game</button>
+</div>
 
 <div id="new-game-dialog" class="popup hidden">
     <div id="new-game-dialog-opponent-radio">
@@ -26,17 +45,6 @@
         <option value="huge">Huge</option>
     </select>
 </div>
-
-<div id="connect-dialog" class="popup hidden">
-    <input type="text" id="connect-dialog-peer-id"></input>
-
-</div>
-
-<div id="incoming-dialog" class="popup hidden">
-
-</div>
-
-<div id="toast" class="hidden"></div>
 
 <div id="canvas"></div>
 
