@@ -6,7 +6,8 @@ from model import Model, encode_input
 
 import sys
 
-# NOTE: scripted model cannot be exported to opset_7, which is the maximum version supported by onnx-js
+# NOTE: scripted model cannot be exported for unknown reason
+# NOTE2: models exported with PyTorch 1.10 produce error on loading. Using PyTorch 1.8 works fine.
 checkpoint = load(sys.argv[1])
 board_type = checkpoint['board_type']
 dummy_game = Game(board_type)
@@ -22,7 +23,7 @@ torch.onnx.export(
     model,
     (pieces, mask),
     'exported_model.onnx',
-    opset_version=7,
+    opset_version=11,
     verbose=True,
     input_names=["pieces", "mask"],
     output_names=["action_probs", "value"]

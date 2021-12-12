@@ -31,9 +31,9 @@ def self_play(board_type, model):
                 return [ (*x, -1 if i%2 == 0 else 1) for i, x in enumerate(data) ]
             if status == 3:
                 return [ (*x, 0) for x in data ]
-            return record, status
+            raise Exception("unknown status")
 
-        mcts.playout(game, 800 - mcts.total_visits())
+        mcts.playout(game, 1200 - mcts.total_visits())
 
         action_probs = mcts.get_action_probs(0.1)
         pieces, mask, probs = encode_input(game, action_probs)
@@ -44,7 +44,7 @@ def self_play(board_type, model):
         # value = mcts.root_value()
         # print(state, action_probs, value)
 
-        old_pos, new_pos = mcts.sample_action(0.2, 0.1)
+        old_pos, new_pos = mcts.sample_action(0.1, 0.1)
         game.do_move(old_pos, new_pos)
         mcts.chroot(old_pos, new_pos)
 
@@ -64,7 +64,7 @@ def worker_run(board_type):
 # Therefore we choose to play multiple games concurrently, each use only one thread.
 def collect_self_play_data(model, board_type="standard", n=1000):
     model.cpu().save('scripted_model.pt')
-    with Pool(8, initializer=worker_init, initargs=('scripted_model.pt',)) as pool:
+    with Pool(60, initializer=worker_init, initargs=('scripted_model.pt',)) as pool:
         data_batches = pool.map(worker_run, (board_type for _ in range(n)), chunksize=1)
     return [ x for batch in data_batches for x in batch ]
 
@@ -72,12 +72,11 @@ def random_batch(data, batch_size):
     return *(np.stack(d, axis=0) for d in zip(*( data[i] for i in np.random.randint(len(data), size=batch_size) ))),
 
 def train(model, optimizer, data):
-    model.train()
+    model.cuda().train()
 
     acc = 0, 0
-    for epoch in range(len(data) // 4):
-        # pieces, masks, probs, scores = ( torch.from_numpy(x).cuda() for x in random_batch(data, 32) )
-        pieces, masks, probs, scores = ( torch.from_numpy(x) for x in random_batch(data, 32) )
+    for epoch in range(len(data) // 8):
+        pieces, masks, probs, scores = ( torch.from_numpy(x).cuda() for x in random_batch(data, 64) )
         policy, value = model(pieces, masks)
         policy_loss = -torch.mean(torch.sum(probs * policy, 1))
         value_loss = torch.nn.functional.mse_loss(value, scores.float())
@@ -86,8 +85,8 @@ def train(model, optimizer, data):
         torch.nn.utils.clip_grad_norm_(model.parameters(), .6)
         optimizer.step()
 
-        acc = acc[0] + policy_loss.item() / 100, acc[1] + value_loss.item() / 100
-        if epoch % 100 == 99:
+        acc = acc[0] + policy_loss.item() / 1000, acc[1] + value_loss.item() / 1000
+        if epoch % 1000 == 999:
             print(*acc)
             acc = 0, 0
 
@@ -120,7 +119,7 @@ if __name__ == '__main__':
             data = load("data_{:03}".format(r))
         except:
             print("collecting data")
-            data = collect_self_play_data(model, board_type, 100)
+            data = collect_self_play_data(model, board_type, 600)
             save(data, "data_{:03}".format(r))
 
         print("load last 5 rounds data")
@@ -132,6 +131,5 @@ if __name__ == '__main__':
                 pass
 
         print("training model")
-        # model.cuda()
         train(model, optimizer, data)
         save({ 'r': r, 'board_type': board_type, 'model_state_dict': model.state_dict(), 'optimizer_state_dict': optimizer.state_dict() }, "model_{:03}".format(r))

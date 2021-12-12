@@ -5,20 +5,29 @@ class Model(torch.nn.Module):
     def __init__(self, board_size, n_pieces):
         super(Model, self).__init__()
         self.n_pieces = n_pieces
-        self.embedding = torch.nn.Embedding(board_size * 4, 192)
-        self.shared_encoder = torch.nn.TransformerEncoder(torch.nn.TransformerEncoderLayer(192, nhead=6, dim_feedforward=256), 6)
+        self.embedding = torch.nn.Embedding(board_size * 4, 256)
+        self.shared_encoder = torch.nn.Sequential(
+            torch.nn.TransformerEncoderLayer(256, nhead=8, dim_feedforward=384),
+            torch.nn.TransformerEncoderLayer(256, nhead=8, dim_feedforward=384),
+            torch.nn.TransformerEncoderLayer(256, nhead=8, dim_feedforward=384),
+            torch.nn.TransformerEncoderLayer(256, nhead=8, dim_feedforward=384),
+            torch.nn.TransformerEncoderLayer(256, nhead=8, dim_feedforward=384),
+            torch.nn.TransformerEncoderLayer(256, nhead=8, dim_feedforward=384),
+        )
         self.policy_encoder = torch.nn.Sequential(
-            torch.nn.Linear(192, 256),
+            torch.nn.Linear(256, 256),
             torch.nn.ReLU(),
-            torch.nn.TransformerEncoder(torch.nn.TransformerEncoderLayer(256, nhead=8, dim_feedforward=384), 2),
+            torch.nn.TransformerEncoderLayer(256, nhead=8, dim_feedforward=384),
+            torch.nn.TransformerEncoderLayer(256, nhead=8, dim_feedforward=384),
         )
         self.policy_decoder = torch.nn.Linear(256, board_size)
         self.value_encoder = torch.nn.Sequential(
-            torch.nn.Linear(192, 256),
+            torch.nn.Linear(256, 192),
             torch.nn.ReLU(),
-            torch.nn.TransformerEncoder(torch.nn.TransformerEncoderLayer(256, nhead=8, dim_feedforward=384), 2),
+            torch.nn.TransformerEncoderLayer(192, nhead=6, dim_feedforward=256),
+            torch.nn.TransformerEncoderLayer(192, nhead=6, dim_feedforward=256),
         )
-        self.value_decoder = torch.nn.Linear(256, 1)
+        self.value_decoder = torch.nn.Linear(192, 1)
 
     def forward(self, pieces, mask):
         mask = (mask - 1) * 100 # -100 is good enough to be considered as -Inf in logits
