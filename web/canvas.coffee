@@ -22,6 +22,10 @@ window.canvas =
         do @draw_board_skeleton
 
     draw_board_skeleton: ->
+        handler_stub =
+            click: (pos) => @handler?.click? pos
+            mouseover: (pos) => @handler?.mouseover? pos
+            mouseout: (pos) => @handler?.mouseout? pos
         @slot_group = do @svg.group
         @slots = for [x, y], i in @board.cartesian
             @slot_group.circle 15
@@ -29,9 +33,9 @@ window.canvas =
                 .fill 'transparent'
                 .stroke 'black'
                 .remember 'id', i
-                .on 'click', -> app.click @remember 'id'
-                .on 'mouseover', -> app.mouseover @remember 'id'
-                .on 'mouseout', -> app.mouseout @remember 'id'
+                .on 'click', -> handler_stub.click @remember 'id'
+                .on 'mouseover', -> handler_stub.mouseover @remember 'id'
+                .on 'mouseout', -> handler_stub.mouseout @remember 'id'
 
     highlight_slot: (id) ->
         @slots[id]
@@ -82,3 +86,5 @@ window.canvas =
                     slot.remember 'color', palette.red_solid
                 else
                     slot.fill 'transparent'
+
+    install_handler: (@handler) ->
