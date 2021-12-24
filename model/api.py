@@ -43,6 +43,9 @@ libcc0.destroy_game.restype = None
 libcc0.new_mcts.argtypes = [ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float))]
 libcc0.new_mcts.restype = ctypes.c_void_p
 
+libcc0.new_mcts_pure.argtypes = []
+libcc0.new_mcts_pure.restype = ctypes.c_void_p
+
 libcc0.mcts_playout.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint32]
 libcc0.mcts_playout.restype = None
 
@@ -142,7 +145,11 @@ class Game:
             libcc0.destroy_game(self.ptr)
 
 class MCTS:
-    def __init__(self, policy_fun):
+    def __init__(self, policy_fun=None):
+        if policy_fun is None:
+            self.ptr = libcc0.new_mcts_pure()
+            return
+
         @ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float))
         def _policy_fun(game_ptr, prior_out, value_out):
             game = Game(game_ptr)

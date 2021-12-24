@@ -8,8 +8,10 @@ edition = "2021"
 crate-type = ["lib", "cdylib"]
 
 [profile.release]
+codegen-units = 1
 lto = true
-opt-level = 's'
 
 [dependencies]
-ordered-float = { version = "2.1", default-features = false }
+ordered-float = { version = "2.8", default-features = false }
+libm = "0.2"
+dlmalloc = { version = "0.2", features = ["global"] }

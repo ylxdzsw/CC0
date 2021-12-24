@@ -71,6 +71,7 @@ window.replay = (records) ->
         .appendChild button
 
 do ->
-    await Promise.all window.ready
+    await wasm_init
+    await new Promise (resolve) -> setTimeout resolve # allow other components to initialize first
 
     do app.init

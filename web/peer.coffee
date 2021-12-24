@@ -1,4 +1,4 @@
-window.ready.push do ->
+do ->
     self_id = Math.floor Math.random() * 1000000
 
     # document.querySelector '#self-id'
@@ -25,21 +25,22 @@ window.ready.push do ->
             .on 'data', (msg) -> handle_message msg
             .on 'error', (err) -> handle_conn_error err
 
-    accept_connection: (incoming) ->
-        if conn?
-            console.error "being connected while already connected"
-            # todo: terminate the incoming connection
+    window.Peer =
+        accept_connection: (incoming) ->
+            if conn?
+                console.error "being connected while already connected"
+                # todo: terminate the incoming connection
 
-        conn = incoming
-            .on 'open', -> # TODO: mark the connection as ready
-            .on 'data', (msg) -> handle_message msg
-            .on 'error', (err) -> handle_conn_error err
+            conn = incoming
+                .on 'open', -> # TODO: mark the connection as ready
+                .on 'data', (msg) -> handle_message msg
+                .on 'error', (err) -> handle_conn_error err
 
-    handle_peer_error: (err) ->
-        console.error err
+        handle_peer_error: (err) ->
+            console.error err
 
-    handle_conn_error: (err) ->
-        console.error err
+        handle_conn_error: (err) ->
+            console.error err
 
-    handle_message: (msg) ->
-        console.log 'received: ' + msg
+        handle_message: (msg) ->
+            console.log 'received: ' + msg

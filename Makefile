@@ -1,11 +1,10 @@
-all: dist/index.html dist/cc0.wasm
+all: dist/index.html
 
-dist/index.html: web/* dist
+dist/index.html: web/* dist target/wasm32-unknown-unknown/release/cc0.wasm
 	npm exec nattoppet web/index.ymd > dist/index.html
 
-dist/cc0.wasm: src/* Cargo.toml
-	RUSTFLAGS="" cargo build --release --target wasm32-unknown-unknown
-	cp target/wasm32-unknown-unknown/release/cc0.wasm dist
+target/wasm32-unknown-unknown/release/cc0.wasm: src/* Cargo.toml
+	RUSTFLAGS="" cargo build --release -Z build-std=core,alloc --target wasm32-unknown-unknown
 
 dist:
 	mkdir -p dist

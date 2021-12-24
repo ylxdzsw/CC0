@@ -1,11 +1,19 @@
-// float point math (sqrt, ln) needs std
-// #![no_std]
+#![no_std]
+#![feature(default_alloc_error_handler)]
 
 #![allow(clippy::missing_safety_doc)]
 
+#[global_allocator]
+static ALLOC: dlmalloc::GlobalDlmalloc = dlmalloc::GlobalDlmalloc;
+
+#[cfg(not(test))]
+#[panic_handler]
+fn panic(_info: &core::panic::PanicInfo) -> ! {
+    loop {}
+}
+
 #[macro_use]
 extern crate alloc;
-
 use alloc::vec::Vec;
 use alloc::boxed::Box;
 
@@ -170,6 +178,11 @@ pub unsafe extern fn new_mcts(policy_cfun: extern fn (*mut game::Game, *mut f32,
         (action_probs, value)
     });
     Box::leak(Box::new(mcts::Tree::new(Some(policy_value_callback))))
+}
+
+#[no_mangle]
+pub unsafe extern fn new_mcts_pure() -> *mut mcts::Tree {
+    Box::leak(Box::new(mcts::Tree::new(None)))
 }
 
 #[no_mangle]

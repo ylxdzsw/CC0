@@ -1,7 +1,5 @@
-window.ready.push do ->
-    wasm = await WebAssembly.instantiateStreaming (fetch "cc0.wasm"), {}
-
-    window.libcc0 = wasm.instance.exports
+do ->
+    await wasm_init
 
     window.INVALID_POSITION = (new Uint8Array libcc0.memory.buffer, libcc0.INVALID_POSITION, 1)[0]
 

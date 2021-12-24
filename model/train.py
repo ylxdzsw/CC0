@@ -66,13 +66,14 @@ def collect_self_play_data(model, board_type="standard", n=1000):
     model.cpu().save('scripted_model.pt')
     with Pool(60, initializer=worker_init, initargs=('scripted_model.pt',)) as pool:
         data_batches = pool.map(worker_run, (board_type for _ in range(n)), chunksize=1)
+    model.cuda()
     return [ x for batch in data_batches for x in batch ]
 
 def random_batch(data, batch_size):
     return *(np.stack(d, axis=0) for d in zip(*( data[i] for i in np.random.randint(len(data), size=batch_size) ))),
 
 def train(model, optimizer, data):
-    model.cuda().train()
+    model.train()
 
     acc = 0, 0
     for epoch in range(len(data) // 8):
