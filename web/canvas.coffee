@@ -28,7 +28,7 @@ window.canvas =
             mouseout: (pos) => @handler?.mouseout? pos
         @slot_group = do @svg.group
         @slots = for [x, y], i in @board.cartesian
-            @slot_group.circle 15
+            @slot_group.circle 20
                 .center x*@scale+@padding, y*@scale+@padding
                 .fill 'transparent'
                 .stroke 'black'
