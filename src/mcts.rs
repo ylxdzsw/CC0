@@ -99,6 +99,39 @@ impl Node {
         -leaf_value
     }
 
+    /// A non-recursive playout_and_update which trys to playout and update the path, calling for action_probs if necessary
+    /// For the first call, the buffer should be of zero length and policy_result should be None.
+    /// If the function returned with an empty buffer, then the update is completed and the buffer can be reused. The game reached the end and should be destroyed.
+    /// If the function returned with a non-empty buffer, then this function is paused and waiting for policy_result.
+    /// The caller should call this function again with the buffer and the mcts tree untouched and provides the policy_result of the game status.
+    unsafe fn playout_and_try_update(&mut self, game: &mut Game, buffer: &mut Vec<*mut Node>, policy_result: Option<(Vec<ActionProb>, f32)>) {
+        macro_rules! last_node { () => { **buffer.last().unwrap() } }
+
+        let mut leaf_value = if buffer.is_empty() { // first call
+            buffer.push(self as *mut Node);
+            while !last_node!().is_leaf() {
+                let child = last_node!().select_chlid();
+                let (from, to) = child.action;
+                game.move_with_role_change(from, to);
+                buffer.push(child as _)
+            }
+            match game.status() {
+                Status::Winner(winner) => if winner == last_node!().player { 1. } else { -1. }
+                Status::Tie => 0.,
+                Status::Unfinished => return // wait for action_probs
+            }
+        } else { // second call
+            let (action_probs, value) = policy_result.unwrap();
+            last_node!().expand(game, &action_probs);
+            -value
+        };
+
+        while let Some(node_ptr) = buffer.pop() {
+            (*node_ptr).update(leaf_value);
+            leaf_value = -leaf_value
+        }
+    }
+
     fn is_leaf(&self) -> bool { self.children.is_empty() }
 
     fn select_chlid(&mut self) -> &mut Node {
@@ -160,6 +193,10 @@ pub struct Tree {
     policy: Option<Box<PolicyValueCallback>> // pick p, move p, value
 }
 
+pub struct TryPlayoutContinuation {
+    pub cont: Box<dyn FnOnce(Vec<ActionProb>, f32) -> Option<TryPlayoutContinuation>>
+}
+
 impl Tree {
     pub fn new(policy: Option<Box<PolicyValueCallback>>) -> Self {
         Self { root: Node::new((INVALID_POSITION, INVALID_POSITION), Player::First, 1.), policy }
@@ -170,6 +207,38 @@ impl Tree {
         for _ in 0..ntimes {
             self.root.playout_and_update_recursive(game.clone(), self.policy.as_deref());
         }
+    }
+
+    pub unsafe fn try_playout(&mut self, game: &Game, ntimes: usize) -> Option<TryPlayoutContinuation> {
+        self.root.player = game.last_player(); // the children of root will be the one play next
+
+        unsafe fn f(
+            root: *mut Node,
+            game_proto: Game,
+            mut game: Game,
+            mut policy_result: Option<(Vec<ActionProb>, f32)>,
+            mut n_remaining: usize,
+            mut buffer: Vec<*mut Node>,
+        ) -> Option<TryPlayoutContinuation> {
+            while n_remaining > 0 {
+                (*root).playout_and_try_update(&mut game, &mut buffer, policy_result);
+                if buffer.is_empty() { // proceed to next itertion
+                    game = game_proto.clone();
+                    policy_result = None;
+                    n_remaining -= 1;
+                } else { // wait for policy results
+                    return Some(TryPlayoutContinuation {
+                        cont: Box::new(move |action_probs, value| {
+                            f(root, game_proto, game, Some((action_probs, value)), n_remaining, buffer)
+                        })
+                    })
+                }
+
+            }
+            None
+        }
+
+        f(&mut self.root, game.clone(), game.clone(), None, ntimes, vec![])
     }
 
     pub fn get_action_probs(&self, temp: f32) -> Vec<ActionProb> { // from, to, prob

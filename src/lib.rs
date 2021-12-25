@@ -1,6 +1,5 @@
 #![no_std]
 #![feature(default_alloc_error_handler)]
-
 #![allow(clippy::missing_safety_doc)]
 
 #[global_allocator]
