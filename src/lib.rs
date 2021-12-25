@@ -190,6 +190,39 @@ pub unsafe extern fn mcts_playout(mcts: *mut mcts::Tree, game: *mut game::Game, 
 }
 
 #[no_mangle]
+pub unsafe extern fn start_try_playout(mcts: *mut mcts::Tree, game: *mut *mut game::Game, ntimes: u32) -> *mut mcts::TryPlayoutContinuation {
+    // the game passed in is unmodified, but the game pointer is pointed to the played game (or null if finished)
+    if let Some(cont) = (*mcts).try_playout(&**game, ntimes as _) {
+        *game = cont.game;
+        Box::leak(Box::new(cont)) as *mut _
+    } else {
+        *game = core::ptr::null_mut();
+        core::ptr::null_mut()
+    }
+}
+
+#[no_mangle]
+pub unsafe extern fn continue_try_playout(cont: *mut *mut mcts::TryPlayoutContinuation, game: *mut *mut game::Game, prior: *mut f32, value: f32) {
+    let self_pieces: Vec<_> = (**game).get_pieces().iter().filter(|p| p.owner == (**game).next_player()).collect();
+    let board_size = (**game).board_size();
+
+    let mut action_probs = vec![];
+    for (from, moves) in (**game).movable_pieces_and_possible_moves_of_current_player() {
+        let i = self_pieces.iter().position(|x| x.position == from).expect("movable piece that not belongs to the player");
+        for to in moves {
+            action_probs.push((from, to, prior.add(i * board_size + to as usize).read()))
+        }
+    }
+    if let Some(new_cont) = (Box::from_raw(*cont).cont)(action_probs, value) {
+        *game = new_cont.game;
+        *cont = Box::leak(Box::new(new_cont));
+    } else {
+        *game = core::ptr::null_mut();
+        *cont = core::ptr::null_mut();
+    }
+}
+
+#[no_mangle]
 pub unsafe extern fn mcts_get_action_probs(mcts: *mut mcts::Tree, temp: f32, actions: *mut EncodedAction, probs: *mut f32, length: *mut u32) {
     let action_probs = (*mcts).get_action_probs(temp);
     *length = action_probs.len() as _;

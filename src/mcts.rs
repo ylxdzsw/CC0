@@ -194,6 +194,7 @@ pub struct Tree {
 }
 
 pub struct TryPlayoutContinuation {
+    pub game: *mut Game,
     pub cont: Box<dyn FnOnce(Vec<ActionProb>, f32) -> Option<TryPlayoutContinuation>>
 }
 
@@ -215,7 +216,7 @@ impl Tree {
         unsafe fn f(
             root: *mut Node,
             game_proto: Game,
-            mut game: Game,
+            mut game: Box<Game>,
             mut policy_result: Option<(Vec<ActionProb>, f32)>,
             mut n_remaining: usize,
             mut buffer: Vec<*mut Node>,
@@ -223,22 +224,22 @@ impl Tree {
             while n_remaining > 0 {
                 (*root).playout_and_try_update(&mut game, &mut buffer, policy_result);
                 if buffer.is_empty() { // proceed to next itertion
-                    game = game_proto.clone();
+                    game = Box::new(game_proto.clone());
                     policy_result = None;
                     n_remaining -= 1;
                 } else { // wait for policy results
                     return Some(TryPlayoutContinuation {
+                        game: &mut *game as _,
                         cont: Box::new(move |action_probs, value| {
                             f(root, game_proto, game, Some((action_probs, value)), n_remaining, buffer)
                         })
                     })
                 }
-
             }
             None
         }
 
-        f(&mut self.root, game.clone(), game.clone(), None, ntimes, vec![])
+        f(&mut self.root, game.clone(), Box::new(game.clone()), None, ntimes, vec![])
     }
 
     pub fn get_action_probs(&self, temp: f32) -> Vec<ActionProb> { // from, to, prob
