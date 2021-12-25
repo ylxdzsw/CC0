@@ -42,7 +42,8 @@ player_menu.add "Local Player", class
                                 return
                             do canvas.clear_all_highlighting
                             @picked = null
-                            resolve [old_pos, pos, old_path]
+                            canvas.install_handler null
+                            resolve [old_pos, pos]
                         when 1
                             @picked = [pos, path]
                             do canvas.clear_all_highlighting
@@ -51,10 +52,11 @@ player_menu.add "Local Player", class
                     if role isnt 1
                         return
                     do canvas.clear_all_path
+                    do canvas.clear_all_highlighting
                     canvas.highlight_slot p for next_hop, p in path when next_hop isnt INVALID_POSITION and p isnt pos
                     @picked = [pos, path]
             mouseover: (pos) =>
-                console.log app.pos_info pos
+                # console.log app.pos_info pos
             mouseout: (pos) =>
 
 window.app =
@@ -76,6 +78,9 @@ window.app =
 
     new_game: ->
         @game = new Game 'standard'
+        @game_info = do @game.dump
+        @path_cache = Object.create null
+
         canvas.init 'standard'
         do canvas.reset
 
@@ -83,12 +88,14 @@ window.app =
         player2 = player_menu.new parseInt document.querySelector("#player-2").value.slice(1)
 
         loop
-            @game_info = do @game.dump
-            @path_cache = Object.create null
             current_player = [player1, player2][@game_info.current_player - 1]
-            [old_pos, new_pos, path] = await do current_player.move
+            [old_pos, new_pos] = await do current_player.move
+            { path } = @pos_info old_pos
 
             @game.do_move old_pos, new_pos
+            @game_info = do @game.dump
+            @path_cache = Object.create null
+
             do canvas.clear_all_path
             do canvas.clear_all_highlighting
             canvas.move_no_trace old_pos, new_pos
@@ -113,8 +120,10 @@ window.replay = (records) ->
     document.querySelector 'body'
         .appendChild button
 
+window.sleep = (ms) -> new Promise (resolve) -> setTimeout resolve, ms
+
 do ->
     await wasm_init
-    await new Promise (resolve) -> setTimeout resolve # allow other components to initialize first
+    await sleep 0 # allow other components to initialize first
 
     do app.init

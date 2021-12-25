@@ -3,6 +3,8 @@ do ->
 
     window.INVALID_POSITION = (new Uint8Array libcc0.memory.buffer, libcc0.INVALID_POSITION, 1)[0]
 
+    libcc0.set_random_seed Math.floor Math.random() * (1 << 30)
+
     # JS does not have finalizers. We uses WeakRef to track living games and destory the underlying pointers when they are gone
     # the reclaim function is run when we are going to allocate a new instance.
     game_ptr_refs = []
@@ -49,12 +51,14 @@ do ->
 
             buffer_ptr = (new Uint32Array libcc0.memory.buffer.slice ptr_buffer_ptr, ptr_buffer_ptr + 4)[0]
             size = (new Uint32Array libcc0.memory.buffer.slice ptr_buffer_ptr + 4, ptr_buffer_ptr + 8)[0]
-            buffer = new Uint8Array libcc0.memory.buffer, buffer_ptr, Number size
+            buffer = new Uint8Array libcc0.memory.buffer, buffer_ptr, size
+
+            result = (buffer[i] for i in [0...@board_size])
 
             libcc0.free_memory ptr_buffer_ptr, 8
             libcc0.free_memory buffer_ptr, size
 
-            buffer[i] for i in [0...@board_size]
+            result
 
         dump: ->
             ptr_buffer_ptr = libcc0.alloc_memory 8 # 4 bytes for buffer pointer (wasm32 is always 32 bit), and 4 bytes for size
@@ -63,7 +67,7 @@ do ->
 
             buffer_ptr = (new Uint32Array libcc0.memory.buffer.slice ptr_buffer_ptr, ptr_buffer_ptr + 4)[0]
             size = (new Uint32Array libcc0.memory.buffer.slice ptr_buffer_ptr + 4, ptr_buffer_ptr + 8)[0]
-            buffer = new Uint8Array libcc0.memory.buffer, buffer_ptr, Number size
+            buffer = new Uint8Array libcc0.memory.buffer, buffer_ptr, size
 
             n_pieces = buffer[0]
             current_player = buffer[1]
@@ -79,6 +83,39 @@ do ->
         get_status: ->
             libcc0.get_status @ptr
 
-    window.MCTS = class
-        constructor: () ->
+    mcts_ptr_refs = []
+    reclaim_mcts_ptr = ->
+        mcts_ptr_refs = mcts_ptr_refs.filter ({ ref, ptr }) ->
+            if not ref.deref()?
+                console.log 'reclaimed a mcts'
+                libcc0.destroy_mcts ptr
+                false
+            else
+                true
 
+    window.MCTS = class
+        constructor: ->
+            @ptr = do libcc0.new_mcts_pure
+            do reclaim_mcts_ptr
+            mcts_ptr_refs.push ref: (new WeakRef @), ptr: @ptr
+
+        playout: (game, ntimes) ->
+            libcc0.mcts_playout @ptr, game.ptr, ntimes
+
+        sample_action: (exploration_prob, temperature) ->
+            action = libcc0.mcts_sample_action @ptr, exploration_prob, temperature
+            [action >> 8, action & 0xff]
+
+        total_visits: ->
+            libcc0.mcts_total_visits @ptr
+
+        root_value: ->
+            libcc0.mcts_root_value @ptr
+
+    player_menu.add "Pure MCTS", class
+        move: ->
+            tree = new MCTS
+            for _ in [0...10]
+                tree.playout app.game, 200
+                await sleep 0
+            tree.sample_action 0, 0.001

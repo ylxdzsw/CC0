@@ -1,5 +1,6 @@
 #![no_std]
 #![feature(default_alloc_error_handler)]
+#![feature(core_intrinsics)]
 #![allow(clippy::missing_safety_doc)]
 
 #[global_allocator]
@@ -8,7 +9,7 @@ static ALLOC: dlmalloc::GlobalDlmalloc = dlmalloc::GlobalDlmalloc;
 #[cfg(not(test))]
 #[panic_handler]
 fn panic(_info: &core::panic::PanicInfo) -> ! {
-    loop {}
+    core::intrinsics::abort()
 }
 
 #[macro_use]
@@ -36,7 +37,7 @@ pub mod mcts;
 
 #[no_mangle]
 pub unsafe extern fn alloc_memory(byte_size: u32) -> *mut u8 {
-    vec![0u8; byte_size as _].leak() as *const _ as _
+    Vec::<u8>::with_capacity(byte_size as _).leak() as *const _ as _
 }
 
 #[no_mangle]
