@@ -85,11 +85,12 @@ window.app =
             { role }
 
     new_game: ->
-        @game = new Game 'standard'
+        board_type = document.querySelector('#board-type').value ? 'standard'
+        @game = new Game board_type
         @game_info = do @game.dump
         @path_cache = Object.create null
 
-        canvas.init 'standard'
+        canvas.init board_type
         do canvas.reset
 
         player1 = player_menu.new parseInt document.querySelector("#player-1").value.slice(1)
