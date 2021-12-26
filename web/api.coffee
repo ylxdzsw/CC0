@@ -60,6 +60,34 @@ do ->
 
             result
 
+        all_possible_moves: ->
+            ptr_buffer_ptr = libcc0.alloc_memory 8
+
+            libcc0.all_possible_moves @ptr, ptr_buffer_ptr, ptr_buffer_ptr + 4
+
+            buffer_ptr = (new Uint32Array libcc0.memory.buffer.slice ptr_buffer_ptr, ptr_buffer_ptr + 4)[0]
+            size = (new Uint32Array libcc0.memory.buffer.slice ptr_buffer_ptr + 4, ptr_buffer_ptr + 8)[0]
+            buffer = new Uint8Array libcc0.memory.buffer, buffer_ptr, size
+
+            possible_moves = []
+            state = -1
+            for i in [0...size]
+                x = buffer[i]
+                if state is 0
+                    break if x is INVALID_POSITION
+                    possible_moves.push [x, []]
+                    state = 1
+                else
+                    if x is INVALID_POSITION
+                        state = 0
+                        continue
+                    possible_moves[possible_moves.length-1][1].push x
+
+            libcc0.free_memory ptr_buffer_ptr, 8
+            libcc0.free_memory buffer_ptr, size
+
+            possible_moves
+
         dump: ->
             ptr_buffer_ptr = libcc0.alloc_memory 8 # 4 bytes for buffer pointer (wasm32 is always 32 bit), and 4 bytes for size
 
@@ -101,6 +129,32 @@ do ->
 
         playout: (game, ntimes) ->
             libcc0.mcts_playout @ptr, game.ptr, ntimes
+
+        start_try_playout: (game, ntimes) ->
+            game_ptr_ptr = libcc0.alloc_memory 4
+            game_ptr_buf = new Uint32Array libcc0.memory.buffer, game_ptr_ptr, 1
+            game_ptr_buf[0] = game.ptr
+
+            cont_ptr = libcc0.start_try_playout @ptr, game_ptr_ptr, ntimes
+            game_ptr = game_ptr_buf[0]
+            libcc0.free_memory game_ptr_ptr, 4
+
+            { cont_ptr, game: (if game_ptr then new Game game_ptr else null) }
+
+        continue_try_playout: (cont_ptr, game, prior, value) ->
+            ptr_buffer_ptr = libcc0.alloc_memory 8 # cont_ptr and game_ptr
+            ptr_buffer = new Uint32Array libcc0.memory.buffer, ptr_buffer_ptr, 2
+            ptr_buffer[0] = cont_ptr
+            ptr_buffer[1] = game.ptr
+            prior_buffer_ptr = libcc0.alloc_memory 4 * prior.length # todo: reuse these buffers?
+            prior_buffer = new Float32Array libcc0.memory.buffer, prior_buffer_ptr, prior.length
+            prior_buffer[i] = Math.exp i for p, i in prior
+            libcc0.continue_try_playout ptr_buffer_ptr, ptr_buffer_ptr + 4, prior_buffer_ptr, value
+            new_cont_ptr = ptr_buffer[0]
+            new_game_ptr = ptr_buffer[1]
+            libcc0.free_memory ptr_buffer_ptr, 8
+            libcc0.free_memory prior_buffer_ptr, 4 * prior.length
+            { cont_ptr: new_cont_ptr, game: (if new_game_ptr then new Game new_game_ptr else null) }
 
         sample_action: (exploration_prob, temperature) ->
             action = libcc0.mcts_sample_action @ptr, exploration_prob, temperature
