@@ -12,6 +12,7 @@ impl Player {
         }
     }
 
+    #[allow(clippy::return_self_not_must_use)]
     pub fn the_other(&self) -> Self {
         match *self {
             Player::First => Player::Second,
@@ -171,36 +172,50 @@ impl Game {
     }
 
     // the winning rule is slightly changed a bit for effective training:
-    // 1. After the first turn of each player, the player whose base gets filled (with both player's pieces) loss immediately
-    // 2. When the turn limits reached (defaults to 5 * n_pieces), the player whose base have less pieces win.
-    // This is due to the following observations:
-    // 1. If we use the simplest rule, that moving all pieces to the opponent's base, pure MCTS never reach an end and the training cannot start.
-    // 2. The second method I tried is to force an end when turn limit reached. The player that put most pieces to the opponent's base win.
-    //   - It looks compatiable to the original rule. However, after training the agents become "defensive" that when a player is going to lose, it will return a piece back to its own base so that the opponent cannot move in, force the game to end in tie.
+    // 1. the game is forced to end in 4 * n_pieces turns.
+    // 2. when the game is forced to end, the game status is check by
+    //   a. the player has more pieces in its own base lose. If it ties, then
+    //   b. the player has more pieces in the opponents base win.
     pub fn status(&self) -> Status {
-        if self.total_moves < 2 {
+        if self.total_moves < 2 * self.n_pieces() {
             return Status::Unfinished
         }
 
-        let (mut n_pieces_in_first_player_base, mut n_pieces_in_second_player_base) = (0, 0);
-        for p in &self.pieces {
-            if self.board_def.base_ids().0.contains(&p.position) { n_pieces_in_first_player_base += 1; }
-            if self.board_def.base_ids().1.contains(&p.position) { n_pieces_in_second_player_base += 1; }
-        }
+        // the base count is (n_pieces_of_the_first_player, n_pieces_of_the_second_player)
+        let first_player_base_count = self.base_ids().0.iter()
+            .filter_map(|pos| self.pindex[*pos as usize])
+            .map(|pind| &self.pieces[pind])
+            .fold((0, 0), |(a, b), piece| {
+                match piece.owner {
+                    Player::First => (a + 1, b),
+                    Player::Second => (a, b + 1),
+                }
+            });
+        let second_player_base_count = self.base_ids().1.iter()
+            .filter_map(|pos| self.pindex[*pos as usize])
+            .map(|pind| &self.pieces[pind])
+            .fold((0, 0), |(a, b), piece| {
+                match piece.owner {
+                    Player::First => (a + 1, b),
+                    Player::Second => (a, b + 1),
+                }
+            });
 
-        if n_pieces_in_first_player_base == self.board_def.n_pieces() {
+        if first_player_base_count.1 == self.n_pieces() {
             return Status::Winner(Player::Second)
         }
 
-        if n_pieces_in_second_player_base == self.board_def.n_pieces() {
+        if second_player_base_count.0 == self.n_pieces() {
             return Status::Winner(Player::First)
         }
 
-        if self.total_moves >= 2 * self.board_def.turn_limit() {
-            match n_pieces_in_first_player_base.cmp(&n_pieces_in_second_player_base) {
+        if self.total_moves >= 2 * self.turn_limit() {
+            match first_player_base_count.0.cmp(&second_player_base_count.1).then(
+                first_player_base_count.1.cmp(&second_player_base_count.0)
+            ) {
                 core::cmp::Ordering::Less => Status::Winner(Player::First),
+                core::cmp::Ordering::Greater => Status::Winner(Player::Second),
                 core::cmp::Ordering::Equal => Status::Tie,
-                core::cmp::Ordering::Greater => Status::Winner(Player::Second)
             }
         } else {
             Status::Unfinished
@@ -215,9 +230,8 @@ mod tests {
     #[test]
     fn game_test_1() {
         let mut game = Game::new(&crate::board::STANDARD_BOARD);
-        let mut possible_moves;
 
-        possible_moves = game.possible_moves_with_path(8);
+        let mut possible_moves = game.possible_moves_with_path(8);
         for &p in &[16, 17] { assert!(possible_moves[p] != INVALID_POSITION) }
         game.move_with_role_change(8, 16);
 

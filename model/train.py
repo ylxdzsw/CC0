@@ -18,7 +18,10 @@ def self_play(board_type, model):
         return torch.squeeze(policy, 0), torch.squeeze(value, 0)
 
     game = Game(board_type)
-    mcts = MCTS(policy_fun)
+    if model is None:
+        mcts = MCTS(model)
+    else:
+        mcts = MCTS(policy_fun)
 
     data = [] # (pieces, masks, probs)
 
@@ -33,9 +36,12 @@ def self_play(board_type, model):
                 return [ (*x, 0) for x in data ]
             raise Exception("unknown status")
 
-        mcts.playout(game, 1200 - mcts.total_visits())
+        if model is None:
+            mcts.playout(game, 8000 - mcts.total_visits())
+        else:
+            mcts.playout(game, 2000 - mcts.total_visits())
 
-        action_probs = mcts.get_action_probs(0.1)
+        action_probs = mcts.get_action_probs(1.0)
         pieces, mask, probs = encode_input(game, action_probs)
 
         data.append((pieces, mask, probs))
@@ -44,12 +50,15 @@ def self_play(board_type, model):
         # value = mcts.root_value()
         # print(state, action_probs, value)
 
-        old_pos, new_pos = mcts.sample_action(0.1, 0.1)
+        old_pos, new_pos = mcts.sample_action(0.1, 1.0)
         game.do_move(old_pos, new_pos)
         mcts.chroot(old_pos, new_pos)
 
 def worker_init(model_path):
     global model
+    if model_path is None:
+        model = None
+        return
     torch.set_num_threads(1)
     import os
     set_random_seed(os.getpid() * 7 + 39393)
@@ -62,11 +71,16 @@ def worker_run(board_type):
 # inference performance: CUDA: 60 playouts/s, SingleThreadCPU: 80 playouts/s, MultiThreadCPU: 105 playouts/s but uses 40% of all 16 cores.
 # TorchScript jit further gives around 10% performance gain.
 # Therefore we choose to play multiple games concurrently, each use only one thread.
-def collect_self_play_data(model, board_type="standard", n=1000):
-    model.cpu().save('scripted_model.pt')
-    with Pool(60, initializer=worker_init, initargs=('scripted_model.pt',)) as pool:
-        data_batches = pool.map(worker_run, (board_type for _ in range(n)), chunksize=1)
-    model.cuda()
+def collect_self_play_data(model, n=1000, board_type="standard"):
+    if model != None:
+        model.cpu().save('scripted_model.pt')
+        with Pool(80, initializer=worker_init, initargs=('scripted_model.pt',)) as pool:
+            data_batches = pool.map(worker_run, (board_type for _ in range(n)), chunksize=1)
+        model.cuda()
+    else:
+        with Pool(80, initializer=worker_init, initargs=(None,)) as pool:
+            data_batches = pool.map(worker_run, (board_type for _ in range(n)), chunksize=1)
+
     return [ x for batch in data_batches for x in batch ]
 
 def random_batch(data, batch_size):
@@ -120,16 +134,22 @@ if __name__ == '__main__':
             data = load("data_{:03}".format(r))
         except:
             print("collecting data")
-            data = collect_self_play_data(model, board_type, 600)
+            if r == 0:
+                data = collect_self_play_data(None, 2000, board_type)
+            else:
+                data = collect_self_play_data(model, 800, board_type)
             save(data, "data_{:03}".format(r))
 
-        print("load last 5 rounds data")
-        for i in range(r-5, r):
+        l = r // 2
+        print(f"load last {l} rounds data")
+        for i in range(r-l, r):
             try:
                 data.extend(load("data_{:03}".format(i)))
             except:
                 print("skip data_{:03}".format(i))
                 pass
+        if r < 5:
+            data.extend(load("data_000"))
 
         print("training model")
         train(model, optimizer, data)

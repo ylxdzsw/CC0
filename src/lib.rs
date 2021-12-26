@@ -1,6 +1,7 @@
 #![no_std]
 #![feature(default_alloc_error_handler)]
 #![feature(core_intrinsics)]
+#![feature(lang_items)]
 #![allow(clippy::missing_safety_doc)]
 
 #[global_allocator]
@@ -11,6 +12,10 @@ static ALLOC: dlmalloc::GlobalDlmalloc = dlmalloc::GlobalDlmalloc;
 fn panic(_info: &core::panic::PanicInfo) -> ! {
     core::intrinsics::abort()
 }
+
+#[cfg(not(test))]
+#[lang = "eh_personality"]
+extern "C" fn eh_personality() {}
 
 #[macro_use]
 extern crate alloc;

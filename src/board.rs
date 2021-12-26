@@ -9,7 +9,7 @@ pub trait Board {
         (1..=self.rank()).sum()
     }
     fn turn_limit(&self) -> usize {
-        self.n_pieces() * 5
+        self.n_pieces() * 4
     }
     fn adj(&self, center: Position) -> &'static [Position];
     fn base_ids(&self) -> (&'static [Position], &'static [Position]);

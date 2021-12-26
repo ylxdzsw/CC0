@@ -61,8 +61,16 @@ player_menu.add "Local Player", class
 
 window.app =
     init: ->
+        document.querySelector '#mctc-iter-slider'
+            .addEventListener 'change', =>
+                document.querySelector('#mctc-iter-slider-label-num').textContent = do @get_mcts_iter
+
         document.querySelector '#new-game-button'
             .addEventListener 'click', => do @new_game
+
+    get_mcts_iter: ->
+        v = Number document.querySelector('#mctc-iter-slider').value
+        Math.floor v * v
 
     # role: 0: empty, 1: self piece, 2: opponenet piece
     pos_info: (pos) ->

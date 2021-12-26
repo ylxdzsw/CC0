@@ -169,7 +169,9 @@ do ->
     player_menu.add "Pure MCTS", class
         move: ->
             tree = new MCTS
-            for _ in [0...10]
-                tree.playout app.game, 200
+            n_iter = 0
+            while n_iter < do app.get_mcts_iter
+                tree.playout app.game, 100
+                n_iter += 100
                 await sleep 0
             tree.sample_action 0, 0.001
