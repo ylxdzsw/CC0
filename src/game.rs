@@ -95,7 +95,7 @@ impl Game {
     pub fn possible_moves_with_path(&self, pos: Position) -> Vec<Position> {
         let moving_piece_id = self.pindex[pos as usize].unwrap();
         let moving_piece_pos = self.pieces[moving_piece_id].position;
-        let mut result = vec![INVALID_POSITION; self.board_def.board_size()];
+        let mut result = vec![INVALID_POSITION; self.board_size()];
         let mut queue = vec![moving_piece_pos];
         result[moving_piece_pos as usize] = moving_piece_pos;
 
@@ -106,7 +106,7 @@ impl Game {
                 let mut hopping_started = false;
 
                 loop {
-                    cp = self.board_def.adj(cp)[direction];
+                    cp = self.adj(cp)[direction];
                     if cp == INVALID_POSITION {
                         break
                     }
@@ -131,7 +131,7 @@ impl Game {
 
         // append single moves
         for direction in 0..6 {
-            let next = self.board_def.adj(moving_piece_pos)[direction];
+            let next = self.adj(moving_piece_pos)[direction];
             if next == INVALID_POSITION || self.pindex[next as usize].is_some() {
                 continue
             }

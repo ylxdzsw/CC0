@@ -19,7 +19,7 @@ def self_play(board_type, model):
 
     game = Game(board_type)
     if model is None:
-        mcts = MCTS(model)
+        mcts = MCTS()
     else:
         mcts = MCTS(policy_fun)
 
@@ -116,7 +116,7 @@ if __name__ == '__main__':
         board_type = sys.argv[1]
 
     dummy_game = Game(board_type)
-    model = torch.jit.script(Model(dummy_game.board_size, dummy_game.n_pieces))
+    model = torch.jit.script(Model(dummy_game.board_size, dummy_game.n_pieces).cuda())
     optimizer = torch.optim.Adam(model.parameters(), lr=2e-5, weight_decay=2e-6)
     r = -1
 
