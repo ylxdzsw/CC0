@@ -1,6 +1,6 @@
 use crate::{INVALID_POSITION, Position, game::{Status, Game, Player}};
-use alloc::vec::Vec;
-use alloc::boxed::Box;
+use std::vec::Vec;
+use std::boxed::Box;
 use ordered_float::OrderedFloat;
 
 static mut RANDOM: u32 = 39393;
@@ -41,8 +41,8 @@ fn uniform_random_choice<T>(x: &[T]) -> &T {
 fn softmax(x: &mut [f32], temp: f32) {
     x.iter_mut().for_each(|v| *v /= temp);
     let m = x.iter().map(|v| OrderedFloat(*v)).max().unwrap().into_inner();
-    let s: f32 = x.iter().map(|v| libm::expf(*v - m)).sum();
-    x.iter_mut().for_each(|v| *v = libm::expf(*v - m - libm::logf(s)));
+    let s: f32 = x.iter().map(|v| (*v - m).exp()).sum();
+    x.iter_mut().for_each(|v| *v = (*v - m - s.ln()).exp());
 }
 
 pub type Action = (Position, Position); // from, to
@@ -143,7 +143,7 @@ impl Node {
     fn puct(&self, pvisit: u32) -> f32 {
         #[allow(non_upper_case_globals)]
         const c_puct: f32 = 2.;
-        let u = c_puct * self.p * libm::sqrtf(pvisit as f32) / (1. + self.n_visits as f32);
+        let u = c_puct * self.p * (pvisit as f32).sqrt() / (1. + self.n_visits as f32);
         self.q + u
     }
 
@@ -246,7 +246,7 @@ impl Tree {
         debug_assert!(!self.root.children.is_empty());
         let mut visits: Vec<f32> = self.root.children.iter().map(|node| node.n_visits as _).collect();
         for v in visits.iter_mut() {
-            *v = libm::logf(*v + 1e-10)
+            *v = (*v + 1e-10).ln()
         }
         softmax(&mut visits, temp);
         self.root.children.iter().zip(visits).map(|(node, prob)| (node.action.0, node.action.1, prob)).collect()

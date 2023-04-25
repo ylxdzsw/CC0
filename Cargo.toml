@@ -13,5 +13,3 @@ lto = true
 
 [dependencies]
 ordered-float = { version = "2.8", default-features = false }
-libm = "0.2"
-dlmalloc = { version = "0.2", features = ["global"] }

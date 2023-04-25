@@ -1,26 +1,8 @@
-#![no_std]
-#![feature(default_alloc_error_handler)]
 #![feature(core_intrinsics)]
-#![feature(lang_items)]
 #![allow(clippy::missing_safety_doc)]
 
-#[global_allocator]
-static ALLOC: dlmalloc::GlobalDlmalloc = dlmalloc::GlobalDlmalloc;
-
-#[cfg(not(test))]
-#[panic_handler]
-fn panic(_info: &core::panic::PanicInfo) -> ! {
-    core::intrinsics::abort()
-}
-
-#[cfg(not(test))]
-#[lang = "eh_personality"]
-extern "C" fn eh_personality() {}
-
-#[macro_use]
-extern crate alloc;
-use alloc::vec::Vec;
-use alloc::boxed::Box;
+use std::vec::Vec;
+use std::boxed::Box;
 
 type Position = u8; // huge board (rank 6) have 253 slots, u8 is just perfect.
 type EncodedAction = u32;

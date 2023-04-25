@@ -1,7 +1,8 @@
 <!doctype html>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="author" content="ylxdzsw@gmail.com">
 <meta charset="utf-8">
+
 <title>CC0</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@svgdotjs/svg.js@3.0/dist/svg.min.js"></script>
@@ -12,7 +13,7 @@
 window.wasm_init = WebAssembly.instantiate(Uint8Array.from(atob("[wasm]"), c => c.charCodeAt(0)), {}).then(wasm => window.libcc0 = wasm.instance.exports)
 </script>
 
-[wasm]= read("cc0.wasm", 'base64')
+[wasm]= read("../target/wasm32-unknown-unknown/release/cc0.wasm", 'base64')
 
 [require](index.less)
 [require](index.html)
@@ -23,4 +24,4 @@ window.wasm_init = WebAssembly.instantiate(Uint8Array.from(atob("[wasm]"), c => 
 [require](canvas.coffee)
 [require](model.coffee)
 
-[mixin] @std/common.ymd
+[mixin] common.ymd
