@@ -132,3 +132,18 @@ end
     println(collect(gen_base_ids(nodes, rank)))
     println(collect.(svg_cartesian(cartesian.(nodes))))
 end
+
+# calculate the distance from each node to the target with BFS
+function score(nodes, adj, target)
+    dist = fill(255, length(nodes))
+    dist[target+1] = 0
+    queue = [target]
+    while !isempty(queue)
+        node = popfirst!(queue)
+        for neibour in adj[node+1, :] @when neibour != 255 && dist[neibour+1] == 255
+            dist[neibour+1] = dist[node+1] + 1
+            push!(queue, neibour)
+        end
+    end
+    dist
+end

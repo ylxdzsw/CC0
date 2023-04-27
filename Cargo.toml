@@ -13,3 +13,6 @@ lto = true
 
 [dependencies]
 ordered-float = { version = "2.8", default-features = false }
+
+[dev-dependencies]
+ctrlc = "3.2"
