@@ -123,8 +123,9 @@ window.replay = (records) ->
     button = document.createElement 'button'
     button.textContent = 'next'
     button.addEventListener 'click', ->
-        [old_pos, new_pos] = do records.shift
+        [old_pos, new_pos, path] = do records.shift
         canvas.move_no_trace old_pos, new_pos
+        canvas.draw_path old_pos, new_pos, path
 
     document.querySelector 'body'
         .appendChild button
