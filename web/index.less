@@ -9,9 +9,11 @@ html, body {
 }
 
 body {
+    position: relative;
     width: 515px;
-    margin: 20px auto;
-    min-height: 650px;
+    margin: 0 auto;
+    padding: 1rem 0 4rem;
+    min-height: calc(100vh - 5rem);
 }
 
 p {
@@ -44,4 +46,17 @@ p {
 
 .hidden {
     display: none;
+}
+
+#bottom-notice {
+    position: absolute;
+    bottom: 0;
+    text-align: center;
+    font-size: .6rem;
+    color: #aaa;
+    width: calc(100% - 40px);
+
+    a {
+        color: #aaa;
+    }
 }

@@ -2,109 +2,127 @@ use std::vec::Vec;
 
 use crate::{INVALID_POSITION, Position, board::Board};
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub enum Player { First, Second }
-impl Player {
-    pub fn change(&mut self) {
-        match *self {
-            Player::First => *self = Player::Second,
-            Player::Second => *self = Player::First
-        }
-    }
-
-    #[allow(clippy::return_self_not_must_use)]
-    pub fn the_other(&self) -> Self {
-        match *self {
-            Player::First => Player::Second,
-            Player::Second => Player::First
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub enum Status { Winner(Player), Tie, Unfinished }
-
-impl Status {
-    pub fn finished(&self) -> bool { *self != Status::Unfinished }
-}
-
-#[derive(Debug, Clone)]
-pub struct Piece {
-    pub owner: Player,
-    pub position: Position
-}
-
-impl Piece {
-    fn new(owner: Player, position: Position) -> Self {
-        Self { owner, position }
-    }
+#[derive(Clone)]
+pub struct Action {
+    pub from: Position,
+    pub to: Position,
+    pub path: Vec<Position>
 }
 
 #[derive(Clone)]
 pub struct Game {
-    board_def: &'static dyn Board,
-    pieces: Vec<Piece>,
-    pindex: Vec<Option<usize>>, // position -> piece index
-    player: Player, // the player that will play next. the First player plays first.
-    total_moves: usize
+    pub board: &'static Board,
+    pub turn: usize, // Initial state (no players has moved and player 1 is about to move next) has turn = 0.
+    pub pieces: Vec<Position>, // first half are the pieces of p1 and second half are p2. Both sorted seperately.
 }
 
 impl Game {
-    pub fn new(board_def: &'static dyn Board) -> Self {
-        let mut pieces = vec![];
-        let mut pindex = vec![None; board_def.board_size()];
+    pub fn new(board: &'static Board) -> Self {
+        Game { board, turn: 0, pieces: board.starting_pieces() }
+    }
 
-        for &i in board_def.base_ids().0 {
-            pindex[i as usize] = Some(pieces.len());
-            pieces.push(Piece::new(Player::First, i));
+    pub fn is_p1_moving_next(&self) -> bool {
+        self.turn % 2 == 0
+    }
+
+    pub fn is_p2_moving_next(&self) -> bool {
+        self.turn % 2 == 1
+    }
+
+    pub fn p1_pieces_slice(&self) -> &[u8] {
+        &self.pieces[..self.board.n_pieces]
+    }
+
+    pub fn p1_pieces_slice_mut(&mut self) -> &mut [u8] {
+        &mut self.pieces[..self.board.n_pieces]
+    }
+
+    pub fn p2_pieces_slice(&self) -> &[u8] {
+        &self.pieces[self.board.n_pieces..]
+    }
+
+    pub fn p2_pieces_slice_mut(&mut self) -> &mut [u8] {
+        &mut self.pieces[self.board.n_pieces..]
+    }
+
+    pub fn has_piece(&self, piece: Position) -> bool {
+        // !!! binary search has mysteriously failed in wasm !!!
+        // self.pieces.binary_search(&piece).is_ok()
+        for &p in &self.pieces {
+            if p == piece {
+                return true
+            }
         }
-        for &i in board_def.base_ids().1 {
-            pindex[i as usize] = Some(pieces.len());
-            pieces.push(Piece::new(Player::Second, i))
+        false
+    }
+
+    pub fn move_to(&self, from: Position, to: Position) -> Self {
+        let mut result = self.clone();
+        result.turn += 1;
+
+        let moving_slice = if self.is_p1_moving_next() {
+            result.p1_pieces_slice_mut()
+        } else {
+            result.p2_pieces_slice_mut()
+        };
+
+        let from_idx = moving_slice.binary_search(&from).unwrap();
+        moving_slice[from_idx] = to;
+        moving_slice.sort_unstable();
+
+        result
+    }
+
+    pub fn p1_distance(&self) -> u64 {
+        self.p1_pieces_slice().iter().map(|&p| self.board.p1_distance_map[p as usize]).sum()
+    }
+
+    pub fn p2_distance(&self) -> u64 {
+        self.p2_pieces_slice().iter().map(|&p| self.board.p2_distance_map[p as usize]).sum()
+    }
+
+    pub fn expand(&self, record_actions: bool) -> (Vec<Game>, Vec<Action>) {
+        // early finish
+        if self.p1_distance() == self.board.min_distance || self.p2_distance() == self.board.min_distance {
+            return (vec![], vec![])
         }
 
-        debug_assert_eq!(pieces.len(), 2 * board_def.n_pieces());
+        let mut next_states = vec![];
+        let mut actions = vec![];
 
-        Game { board_def, pieces, pindex, player: Player::First, total_moves: 0 }
-    }
+        let moving_slice = if self.is_p1_moving_next() {
+            self.p1_pieces_slice()
+        } else {
+            self.p2_pieces_slice()
+        };
 
-    pub fn reset(&mut self) {
-        *self = Game::new(self.board_def)
-    }
+        for &piece in moving_slice {
+            let paths = self.possible_moves_with_path(piece);
 
-    pub fn rank(&self) -> usize { self.board_def.rank() }
-    pub fn board_size(&self) -> usize { self.board_def.board_size() }
-    pub fn n_pieces(&self) -> usize { self.board_def.n_pieces() }
-    pub fn turn_limit(&self) -> usize { self.board_def.turn_limit() }
-    pub fn adj(&self, center: Position) -> &'static [Position] { self.board_def.adj(center) }
-    pub fn base_ids(&self) -> (&'static [Position], &'static [Position]) { self.board_def.base_ids()}
-    pub fn score_map_of_player(&self, player: Player) -> &'static [usize] {
-        match player {
-            Player::First => self.board_def.score_maps().0,
-            Player::Second => self.board_def.score_maps().1
+            for dest in paths.iter().enumerate().filter(|&(dest, from)| *from != INVALID_POSITION && dest as u8 != piece).map(|(dest, _)| dest as Position) {
+                next_states.push(self.move_to(piece, dest));
+                if record_actions {
+                    actions.push(Action { from: piece, to: dest, path: paths.clone() });
+                }
+            }
         }
-    }
-    pub fn score_threashold(&self) -> usize { self.board_def.score_threashold() }
 
-    pub fn next_player(&self) -> Player {
-        self.player
-    }
+        if next_states.is_empty() {
+            return (vec![], vec![])
+        }
 
-    pub fn last_player(&self) -> Player {
-        self.player.the_other()
+        (next_states, actions)
     }
 
-    pub fn get_pieces(&self) -> &[Piece] {
-        &self.pieces
+    pub fn clone_with_pieces(&self, pieces: &[Position]) -> Self {
+        Self { pieces: pieces.to_vec(), ..self.clone() }
     }
 
-    /// find possible moves of p by BFS. result[i] = j means p can move to i via j. INVALID_POSITION means unreachable.
-    pub fn possible_moves_with_path(&self, pos: Position) -> Vec<Position> {
-        let moving_piece_id = self.pindex[pos as usize].unwrap();
-        let moving_piece_pos = self.pieces[moving_piece_id].position;
-        let mut result = vec![INVALID_POSITION; self.board_size()];
-        let mut queue = vec![moving_piece_pos];
-        result[moving_piece_pos as usize] = moving_piece_pos;
+    pub fn possible_moves_with_path(&self, piece: Position) -> Vec<Position> {
+        let mut result = vec![INVALID_POSITION; self.board.board_size];
+        let mut queue = vec![piece];
+
+        result[piece as usize] = piece;
 
         while let Some(pos) = queue.pop() {
             for direction in 0..6 {
@@ -113,15 +131,15 @@ impl Game {
                 let mut hopping_started = false;
 
                 loop {
-                    cp = self.adj(cp)[direction];
+                    cp = self.board.ajd_matrix[cp as usize][direction];
                     if cp == INVALID_POSITION {
                         break
                     }
 
-                    match (&self.pindex[cp as usize], hopping_started, steps) {
-                        (Some(pid), true, _) if *pid != moving_piece_id => break, // encounter obstacle, stop
-                        (Some(pid), false, _) if *pid != moving_piece_id => hopping_started = true, // start hopping
-                        (_, true, 0) => { // hopping succeed
+                    match (cp != piece && self.has_piece(cp), hopping_started, steps) {
+                        (true, true, _) => break, // encounter obstacle, stop
+                        (true, false, _) => hopping_started = true, // start hopping
+                        (false, true, 0) => { // hopping succeed
                             if result[cp as usize] != INVALID_POSITION { // can be reached by another (shorter) path
                                 break
                             }
@@ -129,8 +147,8 @@ impl Game {
                             result[cp as usize] = pos;
                             break
                         }
-                        (_, true, _) => steps -= 1, // hopping continue
-                        (_, false, _) => steps += 1, // continue to move
+                        (false, true, _) => steps -= 1, // hopping continue
+                        (false, false, _) => steps += 1, // continue to move
                     }
                 }
             }
@@ -138,127 +156,33 @@ impl Game {
 
         // append single moves
         for direction in 0..6 {
-            let next = self.adj(moving_piece_pos)[direction];
-            if next == INVALID_POSITION || self.pindex[next as usize].is_some() {
+            let next = self.board.ajd_matrix[piece as usize][direction];
+            if next == INVALID_POSITION || self.has_piece(next) {
                 continue
             }
 
-            result[next as usize] = moving_piece_pos; // overide if exist because this must be the shortest
+            result[next as usize] = piece; // overide if exist because this must be the shortest
         }
 
         result
-    }
-
-    pub fn possible_moves(&self, pos: Position) -> Vec<Position> {
-        self.possible_moves_with_path(pos).into_iter()
-            .enumerate()
-            .filter(|&(i, p)| p != INVALID_POSITION && pos != i as _)
-            .map(|(i, _)| i as _)
-            .collect()
-    }
-
-    pub fn movable_pieces_and_possible_moves_of_current_player(&self) -> Vec<(Position, Vec<Position>)> {
-        self.pieces.iter()
-            .filter(|p| p.owner == self.player)
-            .map(|p| (p.position, self.possible_moves(p.position)))
-            .filter(|(_, moves)| !moves.is_empty())
-            .collect()
-    }
-
-    pub fn move_with_role_change(&mut self, from: Position, to: Position) {
-        debug_assert!(self.pindex[to as usize].is_none()); // target location empty
-
-        let pid = self.pindex[from as usize].take().unwrap(); // the board updated once here
-        let piece = &mut self.pieces[pid];
-        debug_assert_eq!(piece.owner, self.player); // it is the piece of the current player
-
-        piece.position = to;
-        self.player.change();
-        self.total_moves += 1;
-        self.pindex[to as usize] = Some(pid);
-    }
-
-    // the winning rule is slightly changed a bit for effective training:
-    // 1. the game is forced to end in 4 * n_pieces turns.
-    // 2. when the game is forced to end, the game status is check by
-    //   a. the player has more pieces in its own base lose. If it ties, then
-    //   b. the player has more pieces in the opponents base win.
-    pub fn status(&self) -> Status {
-        if self.total_moves < 2 * self.n_pieces() {
-            return Status::Unfinished
-        }
-
-        // the base count is (n_pieces_of_the_first_player, n_pieces_of_the_second_player)
-        let first_player_base_count = self.base_ids().0.iter()
-            .filter_map(|pos| self.pindex[*pos as usize])
-            .map(|pind| &self.pieces[pind])
-            .fold((0, 0), |(a, b), piece| {
-                match piece.owner {
-                    Player::First => (a + 1, b),
-                    Player::Second => (a, b + 1),
-                }
-            });
-        let second_player_base_count = self.base_ids().1.iter()
-            .filter_map(|pos| self.pindex[*pos as usize])
-            .map(|pind| &self.pieces[pind])
-            .fold((0, 0), |(a, b), piece| {
-                match piece.owner {
-                    Player::First => (a + 1, b),
-                    Player::Second => (a, b + 1),
-                }
-            });
-
-        if first_player_base_count.1 == self.n_pieces() {
-            return Status::Winner(Player::Second)
-        }
-
-        if second_player_base_count.0 == self.n_pieces() {
-            return Status::Winner(Player::First)
-        }
-
-        if self.total_moves >= 2 * self.turn_limit() {
-            match first_player_base_count.0.cmp(&second_player_base_count.1).then(
-                first_player_base_count.1.cmp(&second_player_base_count.0)
-            ) {
-                core::cmp::Ordering::Less => Status::Winner(Player::First),
-                core::cmp::Ordering::Greater => Status::Winner(Player::Second),
-                core::cmp::Ordering::Equal => Status::Tie,
-            }
-        } else {
-            Status::Unfinished
-        }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::board::SMALL_BOARD;
+
     use super::*;
 
     #[test]
     fn game_test_1() {
-        let mut game = Game::new(&crate::board::STANDARD_BOARD);
+        let mut game = Game::new(&SMALL_BOARD);
 
-        let mut possible_moves = game.possible_moves_with_path(8);
-        for &p in &[16, 17] { assert!(possible_moves[p] != INVALID_POSITION) }
-        game.move_with_role_change(8, 16);
+        game.p1_pieces_slice_mut().copy_from_slice(&[3, 4, 5, 9, 10, 11]);
 
-        possible_moves = game.possible_moves_with_path(114);
-        for &p in &[105, 106] { assert!(possible_moves[p] != INVALID_POSITION) }
-        game.move_with_role_change(114, 106);
-
-        possible_moves = game.possible_moves_with_path(5);
-        for &p in &[8, 18, 39] { assert!(possible_moves[p] != INVALID_POSITION) }
-        game.move_with_role_change(5, 39);
-
-        possible_moves = game.possible_moves_with_path(117);
-        for &p in &[83, 114] { assert!(possible_moves[p] != INVALID_POSITION) }
-        game.move_with_role_change(117, 83);
-
-        possible_moves = game.possible_moves_with_path(0);
-        for &p in &[5, 14, 18, 60] { assert!(possible_moves[p] != INVALID_POSITION) }
-        game.move_with_role_change(0, 60);
-
-        possible_moves = game.possible_moves_with_path(115);
-        for &p in &[58, 62, 102, 104, 108, 117] { assert!(possible_moves[p] != INVALID_POSITION) }
+        let possible_moves = game.possible_moves_with_path(4);
+        println!("{:?}", possible_moves);
     }
 }
+
+

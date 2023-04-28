@@ -65,6 +65,10 @@ window.app =
             .addEventListener 'change', =>
                 document.querySelector('#mctc-iter-slider-label-num').textContent = do @get_mcts_iter
 
+        document.querySelector '#alphabeta-depth-slider'
+            .addEventListener 'change', =>
+                document.querySelector('#alphabeta-depth-slider-label-num').textContent = do @get_alphabeta_depth
+
         document.querySelector '#new-game-button'
             .addEventListener 'click', => do @new_game
 
@@ -72,14 +76,17 @@ window.app =
         v = Number document.querySelector('#mctc-iter-slider').value
         Math.floor v * v
 
+    get_alphabeta_depth: ->
+        Number document.querySelector('#alphabeta-depth-slider').value
+
     # role: 0: empty, 1: self piece, 2: opponenet piece
     pos_info: (pos) ->
         role = switch
-            when @game_info.current_player is 1 and pos in @game_info.first_players_pieces or @game_info.current_player is 2 and pos in @game_info.second_players_pieces then 1
-            when @game_info.current_player is 2 and pos in @game_info.first_players_pieces or @game_info.current_player is 1 and pos in @game_info.second_players_pieces then 2
+            when @game.is_p1_moving_next() and pos in @game.p1_pieces() or @game.is_p2_moving_next() and pos in @game.p2_pieces() then 1
+            when @game.is_p1_moving_next() and pos in @game.p2_pieces() or @game.is_p2_moving_next() and pos in @game.p1_pieces() then 2
             else 0
         if role
-            path = @path_cache[pos] ?= @game.possible_moves_with_path pos
+            path = @game.possible_moves_with_path pos
             { role, path }
         else
             { role }
@@ -87,8 +94,6 @@ window.app =
     new_game: ->
         board_type = document.querySelector('#board-type').value ? 'standard'
         @game = new Game board_type
-        @game_info = do @game.dump
-        @path_cache = Object.create null
 
         canvas.init board_type
         do canvas.reset
@@ -97,13 +102,11 @@ window.app =
         player2 = player_menu.new parseInt document.querySelector("#player-2").value.slice(1)
 
         loop
-            current_player = [player1, player2][@game_info.current_player - 1]
+            current_player = if @game.is_p1_moving_next() then player1 else player2
             [old_pos, new_pos] = await do current_player.move
             { path } = @pos_info old_pos
 
-            @game.do_move old_pos, new_pos
-            @game_info = do @game.dump
-            @path_cache = Object.create null
+            @game.move_to old_pos, new_pos
 
             do canvas.clear_all_path
             do canvas.clear_all_highlighting
@@ -133,7 +136,7 @@ window.replay = (records) ->
 window.sleep = (ms) -> new Promise (resolve) -> setTimeout resolve, ms
 
 do ->
-    await wasm_init
+    await wasm_ready
     await sleep 0 # allow other components to initialize first
 
     do app.init
