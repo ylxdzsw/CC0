@@ -34,9 +34,9 @@ impl DB {
         }
     }
 
-    fn query(&self, state: &[u8; 2 * BOARD_N_PIECES]) -> (usize, usize) {
+    fn query(&self, key: &[u8; 2 * BOARD_N_PIECES]) -> (usize, usize) {
         let tree = self.tree.read().unwrap();
-        tree.get(state)
+        tree.get(key)
             .map(|(p1win, p2win)| (p1win.load(Ordering::Relaxed) as usize, p2win.load(Ordering::Relaxed) as usize))
             .unwrap_or((0, 0))
     }
@@ -124,7 +124,7 @@ fn playout(count: usize, db: &DB, threads: usize) {
                     if STOP.load(Ordering::Relaxed) {
                         break;
                     }
-                    playout_game(Game::new(), db, Vec::with_capacity(BOARD_TURN_LIMIT));
+                    playout_game(Game::new(), db, &mut vec![]);
                 }
             });
         }
@@ -133,7 +133,7 @@ fn playout(count: usize, db: &DB, threads: usize) {
     db.dump();
 }
 
-fn playout_game(game: Game, db: &DB, mut forbidden_moves: Vec<Game>) -> Status {
+fn playout_game(game: Game, db: &DB, forbidden: &mut Vec<[u8; 2 * BOARD_N_PIECES]>) -> Status {
     let (status, mut next_states, _) = game.eval(false);
 
     if status != Status::Pending {
@@ -141,7 +141,7 @@ fn playout_game(game: Game, db: &DB, mut forbidden_moves: Vec<Game>) -> Status {
         return status;
     }
 
-    next_states.retain(|g| !forbidden_moves.contains(g));
+    next_states.retain(|g| !forbidden.contains(&g.key()));
 
     random_shuffle(&mut next_states);
 
@@ -153,18 +153,18 @@ fn playout_game(game: Game, db: &DB, mut forbidden_moves: Vec<Game>) -> Status {
 
         let history: Vec<_> = next_states.iter().map(|g| db.query(g.key())).collect();
 
-        let pvisit: usize = history.iter().map(|(a, b)| a + b).sum(); // not entirely accurate
+        let pvisit: usize = history.iter().map(|(a, b)| a + b).sum::<usize>() + 1; // not entirely accurate
 
-        // never visited, break to avoid log(0)
-        if pvisit == 0 {
-            break 'next_state next_states[0];
-        }
-
-        let c = 5.0;
+        let c = 1.0;
+        let r = if game.is_p1_moving_next() {
+            game.heuristic().0 * 2.
+        } else {
+            game.heuristic().1 * 2.
+        };
         let log_pvisit = (pvisit as f64).ln();
         let scores = history.iter().map(|(w, l)| {
             if w + l == 0 {
-                return 0.5 + c * (log_pvisit / 1.0).sqrt()
+                return r
             }
             let mut w = *w as f64;
             let mut l = *l as f64;
@@ -172,13 +172,14 @@ fn playout_game(game: Game, db: &DB, mut forbidden_moves: Vec<Game>) -> Status {
                 std::mem::swap(&mut w, &mut l);
             }
             let n = w + l;
-            (w / n) + c * (log_pvisit / n).sqrt()
+            (w / n) + (c + r) * (log_pvisit / n).sqrt()
         }).collect::<Vec<_>>();
         next_states.into_iter().zip(scores).max_by(|(_, a), (_, b)| a.total_cmp(b)).unwrap().0
     };
 
-    forbidden_moves.push(game);
-    let final_status = playout_game(next_state, db, forbidden_moves);
+    forbidden.push(*game.key());
+
+    let final_status = playout_game(next_state, db, forbidden);
     db.record_status(game.key(), final_status);
     final_status
 }
@@ -194,7 +195,7 @@ fn analyze(db: &DB) {
     println!("average turns: {}", total_turns as f32 / 32.);
 
     println!("example play:");
-    for (src, dest, path) in random_play(&Game::new(), db) {
+    for (src, dest, _path) in random_play(&Game::new(), db) {
         println!("{} -> {}", src, dest);
     }
 }
@@ -208,12 +209,25 @@ fn random_play(game: &Game, db: &DB) -> Vec<(Position, Position, [Position; BOAR
 
     let history: Vec<_> = next_states.iter().map(|g| db.query(g.key())).collect();
     println!("history: {:?}", history);
-    let mut visits: Vec<_> = history.iter()
-        .map(|(a, b)| a + b)
-        .map(|visit| (visit as f32 + 1e-10).ln())
+    let mut win_rates: Vec<_> = history.iter()
+        .map(|(p1win, p2win)| {
+            if *p1win + *p2win == 0 {
+                return if game.is_p1_moving_next() {
+                    game.heuristic().0
+                } else {
+                    game.heuristic().1
+                } as f32
+            }
+            let mut p1win = *p1win as f32;
+            let mut p2win = *p2win as f32;
+            if game.is_p2_moving_next() {
+                std::mem::swap(&mut p1win, &mut p2win);
+            }
+            p1win / (p1win + p2win)
+        })
         .collect();
-    softmax(&mut visits, 1.0);
-    let i = sample_categorical(visits.into_iter());
+    softmax(&mut win_rates, 0.2);
+    let i = sample_categorical(win_rates.into_iter());
     let mut result = vec![actions[i]];
     result.extend_from_slice(&random_play(&next_states[i], db));
     return result
@@ -232,17 +246,18 @@ const INVALID_POSITION: Position = Position::MAX;
 // const STARTING_STATE: &'static [Position; 1 + 2 * BOARD_N_PIECES] = &[0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120];
 // const BOARD_P1_SCORE: &'static [usize; BOARD_SIZE] = &[16, 15, 15, 14, 14, 14, 13, 13, 13, 13, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 7, 7, 7, 7, 7, 7, 7, 7, 8, 8, 7, 6, 6, 6, 6, 6, 6, 6, 7, 8, 8, 7, 6, 5, 5, 5, 5, 5, 5, 6, 7, 8, 8, 7, 6, 5, 4, 4, 4, 4, 4, 5, 6, 7, 8, 3, 3, 3, 3, 2, 2, 2, 1, 1, 0];
 // const BOARD_P2_SCORE: &'static [usize; BOARD_SIZE] = &[0, 1, 1, 2, 2, 2, 3, 3, 3, 3, 8, 7, 6, 5, 4, 4, 4, 4, 4, 5, 6, 7, 8, 8, 7, 6, 5, 5, 5, 5, 5, 5, 6, 7, 8, 8, 7, 6, 6, 6, 6, 6, 6, 6, 7, 8, 8, 7, 7, 7, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 13, 13, 13, 13, 14, 14, 14, 15, 15, 16];
+// const BOARD_SCORE_THRESH: usize = 16;
 
 const BOARD_N_PIECES: usize = 6;
 const BOARD_SIZE: usize = 73;
-const BOARD_TURN_LIMIT: usize = 4 * BOARD_N_PIECES;
+const BOARD_TURN_LIMIT: usize = 6 * BOARD_N_PIECES;
 const BOARD_ADJ_MATRIX: &'static [[Position; 6]; BOARD_SIZE] = &[[1,2,255,255,255,255],[3,4,2,0,255,255],[4,5,255,255,0,1],[9,10,4,1,255,255],[10,11,5,2,1,3],[11,12,255,255,2,4],[255,16,7,255,255,255],[16,17,8,255,255,6],[17,18,9,255,255,7],[18,19,10,3,255,8],[19,20,11,4,3,9],[20,21,12,5,4,10],[21,22,13,255,5,11],[22,23,14,255,255,12],[23,24,15,255,255,13],[24,255,255,255,255,14],[255,25,17,7,6,255],[25,26,18,8,7,16],[26,27,19,9,8,17],[27,28,20,10,9,18],[28,29,21,11,10,19],[29,30,22,12,11,20],[30,31,23,13,12,21],[31,32,24,14,13,22],[32,255,255,15,14,23],[255,33,26,17,16,255],[33,34,27,18,17,25],[34,35,28,19,18,26],[35,36,29,20,19,27],[36,37,30,21,20,28],[37,38,31,22,21,29],[38,39,32,23,22,30],[39,255,255,24,23,31],[40,41,34,26,25,255],[41,42,35,27,26,33],[42,43,36,28,27,34],[43,44,37,29,28,35],[44,45,38,30,29,36],[45,46,39,31,30,37],[46,47,255,32,31,38],[48,49,41,33,255,255],[49,50,42,34,33,40],[50,51,43,35,34,41],[51,52,44,36,35,42],[52,53,45,37,36,43],[53,54,46,38,37,44],[54,55,47,39,38,45],[55,56,255,255,39,46],[57,58,49,40,255,255],[58,59,50,41,40,48],[59,60,51,42,41,49],[60,61,52,43,42,50],[61,62,53,44,43,51],[62,63,54,45,44,52],[63,64,55,46,45,53],[64,65,56,47,46,54],[65,66,255,255,47,55],[255,255,58,48,255,255],[255,255,59,49,48,57],[255,255,60,50,49,58],[255,67,61,51,50,59],[67,68,62,52,51,60],[68,69,63,53,52,61],[69,255,64,54,53,62],[255,255,65,55,54,63],[255,255,66,56,55,64],[255,255,255,255,56,65],[255,70,68,61,60,255],[70,71,69,62,61,67],[71,255,255,63,62,68],[255,72,71,68,67,255],[72,255,255,69,68,70],[255,255,255,71,70,255]];
 const BOARD_P1_BASE: &'static [Position; BOARD_N_PIECES] = &[0, 1, 2, 3, 4, 5];
 const BOARD_P2_BASE: &'static [Position; BOARD_N_PIECES] = &[67, 68, 69, 70, 71, 72];
 const STARTING_STATE: &'static [Position; 1 + 2 * BOARD_N_PIECES] = &[0, 0, 1, 2, 3, 4, 5, 67, 68, 69, 70, 71, 72];
 const BOARD_P1_SCORE: &'static [usize; BOARD_SIZE] = &[12, 11, 11, 10, 10, 10, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 8, 8, 8, 8, 8, 8, 8, 8, 8, 7, 7, 7, 7, 7, 7, 7, 7, 6, 6, 6, 6, 6, 6, 6, 6, 5, 5, 5, 5, 5, 5, 6, 6, 5, 4, 4, 4, 4, 4, 5, 6, 6, 5, 4, 3, 3, 3, 3, 4, 5, 6, 2, 2, 2, 1, 1, 0];
 const BOARD_P2_SCORE: &'static [usize; BOARD_SIZE] = &[0, 1, 1, 2, 2, 2, 6, 5, 4, 3, 3, 3, 3, 4, 5, 6, 6, 5, 4, 4, 4, 4, 4, 5, 6, 6, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 8, 8, 8, 8, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 10, 10, 10, 11, 11, 12];
-
+const BOARD_SCORE_THRESH: usize = 12;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 enum Status { P1Win, P2Win, Pending }
@@ -374,6 +389,34 @@ impl Game {
     // database key. Currently omit the turn.
     fn key(&self) -> &[u8; 2 * BOARD_N_PIECES] {
         self.0[1..].try_into().unwrap()
+    }
+
+    fn load_from_key(&mut self, key: &[u8; 2 * BOARD_N_PIECES]) {
+        self.0[1..].copy_from_slice(key);
+    }
+
+    fn heuristic(&self) -> (f64, f64) {
+        let p1score = self.p1_score() as f64;
+        let p2score = self.p2_score() as f64;
+
+        if p1score > p2score {
+            let reward = (p1score - p2score) / BOARD_SCORE_THRESH as f64 / 2.;
+            let reward_normalized = if reward > 0.49 {
+                0.49
+            } else {
+                reward
+            };
+            (0.5 - reward_normalized, 0.5 + reward_normalized)
+        } else {
+            let reward = (p2score - p1score) / BOARD_SCORE_THRESH as f64 / 2.;
+            let reward_normalized = if reward > 0.49 {
+                0.49
+            } else {
+                reward
+            };
+            (0.5 + reward_normalized, 0.5 - reward_normalized)
+        }
+
     }
 }
 

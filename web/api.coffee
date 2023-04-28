@@ -122,8 +122,11 @@ do ->
                 true
 
     window.MCTS = class
-        constructor: ->
-            @ptr = do libcc0.new_mcts_pure
+        constructor: (heuristic = false) ->
+            if heuristic
+                @ptr = do libcc0.new_mcts_pure
+            else
+                @ptr = do libcc0.new_mcts_heuristic
             do reclaim_mcts_ptr
             mcts_ptr_refs.push ref: (new WeakRef @), ptr: @ptr
 
@@ -169,6 +172,16 @@ do ->
     player_menu.add "Pure MCTS", class
         move: ->
             tree = new MCTS
+            n_iter = 0
+            while n_iter < do app.get_mcts_iter
+                tree.playout app.game, 100
+                n_iter += 100
+                await sleep 0
+            tree.sample_action 0, 0.001
+
+    player_menu.add "Heuristic MCTS", class
+        move: ->
+            tree = new MCTS true
             n_iter = 0
             while n_iter < do app.get_mcts_iter
                 tree.playout app.game, 100

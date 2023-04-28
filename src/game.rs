@@ -78,6 +78,13 @@ impl Game {
     pub fn turn_limit(&self) -> usize { self.board_def.turn_limit() }
     pub fn adj(&self, center: Position) -> &'static [Position] { self.board_def.adj(center) }
     pub fn base_ids(&self) -> (&'static [Position], &'static [Position]) { self.board_def.base_ids()}
+    pub fn score_map_of_player(&self, player: Player) -> &'static [usize] {
+        match player {
+            Player::First => self.board_def.score_maps().0,
+            Player::Second => self.board_def.score_maps().1
+        }
+    }
+    pub fn score_threashold(&self) -> usize { self.board_def.score_threashold() }
 
     pub fn next_player(&self) -> Player {
         self.player

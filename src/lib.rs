@@ -173,6 +173,41 @@ pub unsafe extern fn new_mcts_pure() -> *mut mcts::Tree {
 }
 
 #[no_mangle]
+pub unsafe extern fn new_mcts_hueristic() -> *mut mcts::Tree {
+    fn scores_to_value(game: &game::Game, self_score: usize, oppo_score: usize) -> f32 {
+        let mut diff = (self_score as f32 - oppo_score as f32) / game.score_threashold() as f32;
+        if diff > 0.5 { diff = 0.5 }
+        if diff < -0.5 { diff = -0.5 }
+        (0.5 - diff) * 100.
+    }
+
+    let heuristic_callback = Box::new(move |game: &game::Game| {
+        let mut action_probs = vec![];
+        let this_self_score = game.get_pieces().iter().filter(|p| p.owner == game.next_player()).map(|p| game.score_map_of_player(p.owner)[p.position as usize]).sum::<usize>();
+        let oppo_score = game.get_pieces().iter().filter(|p| p.owner != game.next_player()).map(|p| game.score_map_of_player(p.owner)[p.position as usize]).sum::<usize>();
+        for (from, moves) in game.movable_pieces_and_possible_moves_of_current_player() {
+            for to in moves {
+                let mut self_score = 0;
+                for piece in game.get_pieces() {
+                    if piece.owner == game.next_player() {
+                        if piece.position == from {
+                            self_score += game.score_map_of_player(piece.owner)[to as usize]
+                        } else {
+                            self_score += game.score_map_of_player(piece.owner)[piece.position as usize]
+                        }
+                    }
+                }
+                action_probs.push((from, to, scores_to_value(game, self_score, oppo_score)))
+            }
+        }
+
+        (action_probs, scores_to_value(game, this_self_score, oppo_score))
+    });
+
+    Box::leak(Box::new(mcts::Tree::new(Some(heuristic_callback))))
+}
+
+#[no_mangle]
 pub unsafe extern fn mcts_playout(mcts: *mut mcts::Tree, game: *mut game::Game, ntimes: u32) {
     (*mcts).playout(&*game, ntimes as _)
 }

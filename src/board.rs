@@ -9,10 +9,12 @@ pub trait Board {
         (1..=self.rank()).sum()
     }
     fn turn_limit(&self) -> usize {
-        self.n_pieces() * 4
+        self.n_pieces() * 6
     }
     fn adj(&self, center: Position) -> &'static [Position];
     fn base_ids(&self) -> (&'static [Position], &'static [Position]);
+    fn score_maps(&self) -> (&'static [usize], &'static [usize]);
+    fn score_threashold(&self) -> usize;
 }
 
 /// The standard board has 10 slots in each corner
@@ -29,6 +31,11 @@ impl Board for StandardBoard {
         static BASE_IDS: ([Position; 10], [Position; 10]) = ([0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [111, 112, 113, 114, 115, 116, 117, 118, 119, 120]);
         (&BASE_IDS.0, &BASE_IDS.1)
     }
+    fn score_maps(&self) -> (&'static [usize], &'static [usize]) {
+        static SCORE_MAP: ([usize; 121], [usize; 121]) = ([16, 15, 15, 14, 14, 14, 13, 13, 13, 13, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 7, 7, 7, 7, 7, 7, 7, 7, 8, 8, 7, 6, 6, 6, 6, 6, 6, 6, 7, 8, 8, 7, 6, 5, 5, 5, 5, 5, 5, 6, 7, 8, 8, 7, 6, 5, 4, 4, 4, 4, 4, 5, 6, 7, 8, 3, 3, 3, 3, 2, 2, 2, 1, 1, 0], [0, 1, 1, 2, 2, 2, 3, 3, 3, 3, 8, 7, 6, 5, 4, 4, 4, 4, 4, 5, 6, 7, 8, 8, 7, 6, 5, 5, 5, 5, 5, 5, 6, 7, 8, 8, 7, 6, 6, 6, 6, 6, 6, 6, 7, 8, 8, 7, 7, 7, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 13, 13, 13, 13, 14, 14, 14, 15, 15, 16]);
+        (&SCORE_MAP.0, &SCORE_MAP.1)
+    }
+    fn score_threashold(&self) -> usize { 16 }
 }
 
 pub const STANDARD_BOARD: StandardBoard = StandardBoard;
@@ -47,6 +54,11 @@ impl Board for SmallBoard {
         static BASE_IDS: ([Position; 6], [Position; 6]) = ([0, 1, 2, 3, 4, 5], [67, 68, 69, 70, 71, 72]);
         (&BASE_IDS.0, &BASE_IDS.1)
     }
+    fn score_maps(&self) -> (&'static [usize], &'static [usize]) {
+        static SCORE_MAP: ([usize; 73], [usize; 73]) = ([12, 11, 11, 10, 10, 10, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 8, 8, 8, 8, 8, 8, 8, 8, 8, 7, 7, 7, 7, 7, 7, 7, 7, 6, 6, 6, 6, 6, 6, 6, 6, 5, 5, 5, 5, 5, 5, 6, 6, 5, 4, 4, 4, 4, 4, 5, 6, 6, 5, 4, 3, 3, 3, 3, 4, 5, 6, 2, 2, 2, 1, 1, 0], [0, 1, 1, 2, 2, 2, 6, 5, 4, 3, 3, 3, 3, 4, 5, 6, 6, 5, 4, 4, 4, 4, 4, 5, 6, 6, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 8, 8, 8, 8, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 10, 10, 10, 11, 11, 12]);
+        (&SCORE_MAP.0, &SCORE_MAP.1)
+    }
+    fn score_threashold(&self) -> usize { 12 }
 }
 
 pub const SMALL_BOARD: SmallBoard = SmallBoard;
