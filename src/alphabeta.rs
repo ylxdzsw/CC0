@@ -1,28 +1,13 @@
 use crate::{game::{Game, Action}, random_shuffle};
 
-// higher is better for p1
-fn heuristic(game: &Game) -> f64 {
-    let mut p1_dist = game.p1_distance();
-    if p1_dist <= game.board.min_distance {
-        p1_dist = 0 // enlarge the wining gap
-    }
-
-    let mut p2_dist = game.p2_distance();
-    if p2_dist <= game.board.min_distance {
-        p2_dist = 0
-    }
-
-    p2_dist as f64 - p1_dist as f64
-}
-
 fn _alphabeta(game: &Game, remaining_depth: usize, alpha: f64, beta: f64) -> f64 {
     if remaining_depth <= 0 {
-        return heuristic(game)
+        return game.heuristic()
     }
 
     let (next_states, _) = game.expand(false);
     if next_states.is_empty() {
-        return heuristic(game)
+        return game.heuristic()
     }
 
     if game.is_p1_moving_next() {

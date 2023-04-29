@@ -59,11 +59,35 @@ do ->
         move_to: (old_pos, new_pos) ->
             cc0.game_move_to @ptr, old_pos, new_pos
 
+        turn: ->
+            cc0.game_turn @ptr
 
-    player_menu.add "Alphabeta Player", class
+        update_status_bar: ->
+            app.update_status_bar "Turn": @turn()
+            if @get_status() == 0
+                app.update_status_bar "Status": if @is_p1_moving_next() then "Player 1 moving" else "Player 2 moving"
+            else
+                app.update_status_bar "Status": switch @get_status()
+                    when 1 then "Player 1 won"
+                    when 2 then "Player 2 won"
+                    when 3 then "Tie"
+
+        free: ->
+            cc0.free_game @ptr
+
+    player_menu.add "Alphabeta + Heuristic", class
         move: ->
-            cc0.alphabeta app.game.ptr, do app.get_alphabeta_depth
-            action = do read_wasm_json
             await sleep 0
+            cc0.alphabeta app.game.ptr, do app.get_alphabeta_depth
+            await sleep 0
+            action = do read_wasm_json
+            [action.from, action.to]
+
+    player_menu.add "Greedy + Heuristic", class
+        move: ->
+            await sleep 0
+            cc0.greedy app.game.ptr, do app.get_temperature
+            await sleep 0
+            action = do read_wasm_json
             [action.from, action.to]
 

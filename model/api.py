@@ -1,196 +1,127 @@
+import json
 import ctypes
 
 libcc0 = ctypes.cdll.LoadLibrary("../target/release/libcc0.so")
 
 INVALID_POSITION = ctypes.c_uint8.in_dll(libcc0, "INVALID_POSITION").value
 
-libcc0.alloc_memory.argtypes = [ctypes.c_uint32]
-libcc0.alloc_memory.restype = ctypes.POINTER(ctypes.c_uint8)
+JSON_BUFFER = (ctypes.c_size_t * 3).in_dll(libcc0, "JSON_BUFFER")
 
-libcc0.free_memory.argtypes = [ctypes.POINTER(ctypes.c_uint8), ctypes.c_uint32]
-libcc0.free_memory.restype = None
+libcc0.alloc_json_buffer.argtypes = [ctypes.c_uint32]
+libcc0.alloc_json_buffer.restype = None
+
+libcc0.free_json_buffer.argtypes = []
+libcc0.free_json_buffer.restype = None
 
 libcc0.set_random_seed.argtypes = [ctypes.c_uint32]
 libcc0.set_random_seed.restype = None
 
-libcc0.new_standard_game.argtypes = []
-libcc0.new_standard_game.restype = ctypes.c_void_p
-
 libcc0.new_small_game.argtypes = []
 libcc0.new_small_game.restype = ctypes.c_void_p
 
-libcc0.get_board_size.argtypes = [ctypes.c_void_p]
-libcc0.get_board_size.restype = ctypes.c_uint32
+libcc0.new_standard_game.argtypes = []
+libcc0.new_standard_game.restype = ctypes.c_void_p
 
-libcc0.get_n_pieces.argtypes = [ctypes.c_void_p]
-libcc0.get_n_pieces.restype = ctypes.c_uint32
+libcc0.free_game.argtypes = [ctypes.c_void_p]
+libcc0.free_game.restype = None
 
-libcc0.all_possible_moves.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.POINTER(ctypes.c_uint8)), ctypes.POINTER(ctypes.c_uint32)]
-libcc0.all_possible_moves.restype = None
+libcc0.game_board_info.argtypes = [ctypes.c_void_p]
+libcc0.game_board_info.restype = None
 
-libcc0.do_move.argtypes = [ctypes.c_void_p, ctypes.c_uint8, ctypes.c_uint8]
-libcc0.do_move.restype = None
+libcc0.game_is_p1_moving_next.argtypes = [ctypes.c_void_p]
+libcc0.game_is_p1_moving_next.restype = ctypes.c_bool
 
-libcc0.get_status.argtypes = [ctypes.c_void_p]
-libcc0.get_status.restype = ctypes.c_uint8
+libcc0.game_is_p2_moving_next.argtypes = [ctypes.c_void_p]
+libcc0.game_is_p2_moving_next.restype = ctypes.c_bool
 
-libcc0.dump.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.POINTER(ctypes.c_uint8)), ctypes.POINTER(ctypes.c_uint32)]
-libcc0.dump.restype = None
+libcc0.game_p1_pieces.argtypes = [ctypes.c_void_p]
+libcc0.game_p1_pieces.restype = None
 
-libcc0.destroy_game.argtypes = [ctypes.c_void_p]
-libcc0.destroy_game.restype = None
+libcc0.game_p2_pieces.argtypes = [ctypes.c_void_p]
+libcc0.game_p2_pieces.restype = None
 
-libcc0.new_mcts.argtypes = [ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float))]
-libcc0.new_mcts.restype = ctypes.c_void_p
+libcc0.game_get_status.argtypes = [ctypes.c_void_p]
+libcc0.game_get_status.restype = ctypes.c_uint8
 
-libcc0.new_mcts_pure.argtypes = []
-libcc0.new_mcts_pure.restype = ctypes.c_void_p
+libcc0.game_move_to.argtypes = [ctypes.c_void_p, ctypes.c_uint8, ctypes.c_uint8]
+libcc0.game_move_to.restype = None
 
-libcc0.mcts_playout.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint32]
-libcc0.mcts_playout.restype = None
+libcc0.game_possible_moves_with_path.argtypes = [ctypes.c_void_p, ctypes.c_uint8]
+libcc0.game_possible_moves_with_path.restype = None
 
-libcc0.mcts_get_action_probs.argtypes = [ctypes.c_void_p, ctypes.c_float, ctypes.POINTER(ctypes.c_uint32), ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_uint32)]
-libcc0.mcts_get_action_probs.restype = None
+libcc0.game_turn.argtypes = [ctypes.c_void_p]
+libcc0.game_turn.restype = ctypes.c_size_t
 
-libcc0.mcts_sample_action.argtypes = [ctypes.c_void_p, ctypes.c_float, ctypes.c_float]
-libcc0.mcts_sample_action.restype = ctypes.c_uint32
+libcc0.alphabeta.argtypes = [ctypes.c_void_p, ctypes.c_size_t]
+libcc0.alphabeta.restype = None
 
-libcc0.mcts_chroot.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
-libcc0.mcts_chroot.restype = None
+libcc0.greedy.argtypes = [ctypes.c_void_p, ctypes.c_double]
+libcc0.greedy.restype = None
 
-libcc0.mcts_total_visits.argtypes = [ctypes.c_void_p]
-libcc0.mcts_total_visits.restype = ctypes.c_uint32
+def read_wasm_json():
+    [ptr, size, _] = JSON_BUFFER
+    s = ctypes.string_at(ptr, size)
+    libcc0.free_json_buffer()
+    return json.loads(s)
 
-libcc0.mcts_root_value.argtypes = [ctypes.c_void_p]
-libcc0.mcts_root_value.restype = ctypes.c_float
-
-libcc0.destroy_mcts.argtypes = [ctypes.c_void_p]
-libcc0.destroy_mcts.restype = None
-
-def encode_action(old_pos, new_pos):
-    return (old_pos << 8) + new_pos
-
-def decode_action(action):
-    return (action >> 8, action & 0xff)
+def write_wasm_json(obj):
+    s = json.dumps(obj).encode("utf-8")
+    libcc0.alloc_json_buffer(ctypes.c_uint32(len(s)))
+    [ptr, *_] = JSON_BUFFER
+    ctypes.memmove(ptr, s, len(s))
+    JSON_BUFFER[1] = ctypes.c_size_t(len(s))
 
 class Game:
     def __init__(self, board_type="standard"):
-        if board_type == "standard":
-            self.ptr = libcc0.new_standard_game()
-            self.no_drop = False
-        elif board_type == "small":
-            self.ptr = libcc0.new_small_game()
-            self.no_drop = False
-        else: # construct directly with ptr
-            self.ptr = board_type
-            self.no_drop = True
+        match board_type:
+            case "standard":
+                self.ptr = libcc0.new_standard_game()
+            case "small":
+                self.ptr = libcc0.new_small_game()
+            case _:
+                raise ValueError(f"Unknown board type: {board_type}")
 
-        self.board_size = self.get_board_size()
-        self.n_pieces = self.get_n_pieces()
+        self.n_pieces = self.board_info()["n_pieces"]
+        self.board_size = self.board_info()["board_size"]
 
-    def get_board_size(self):
-        return libcc0.get_board_size(self.ptr)
+    def board_info(self):
+        libcc0.game_board_info(self.ptr)
+        return read_wasm_json()
 
-    def get_n_pieces(self):
-        return libcc0.get_n_pieces(self.ptr)
+    def is_p1_moving_next(self):
+        return libcc0.game_is_p1_moving_next(self.ptr)
 
-    def all_possible_moves(self):
-        buffer_ptr = ctypes.POINTER(ctypes.c_uint8)()
-        size = ctypes.c_uint32(0)
-        libcc0.all_possible_moves(self.ptr, ctypes.byref(buffer_ptr), ctypes.byref(size))
+    def is_p2_moving_next(self):
+        return libcc0.game_is_p2_moving_next(self.ptr)
 
-        possible_moves = []
-        state = -1
-        for i in range(size.value): # size is the capacity of the vector, the actual length may be smaller
-            x = buffer_ptr[i]
-            if state == 0: # reading piece position
-                if x == INVALID_POSITION: # terminated
-                    break
-                possible_moves.append((x, []))
-                state = 1
-            else: # reading moving targets
-                if x == INVALID_POSITION: # start next
-                    state = 0
-                    continue
-                possible_moves[-1][1].append(x)
+    def p1_pieces(self):
+        libcc0.game_p1_pieces(self.ptr)
+        return read_wasm_json()
 
-        libcc0.free_memory(buffer_ptr, size)
+    def p2_pieces(self):
+        libcc0.game_p2_pieces(self.ptr)
+        return read_wasm_json()
 
-        return possible_moves
-
-    def do_move(self, old_pos, new_pos):
-        libcc0.do_move(self.ptr, old_pos, new_pos)
-
-    # 1: first player won, 2: second player won, 3: tie, 0: unfinished.
     def get_status(self):
-        return libcc0.get_status(self.ptr)
+        return libcc0.game_get_status(self.ptr)
 
-    # return (player, first player's pieces' positions, second player's pieces' positions)
-    def dump(self):
-        buffer_ptr = ctypes.POINTER(ctypes.c_uint8)()
-        size = ctypes.c_uint32(0)
-        libcc0.dump(self.ptr, ctypes.byref(buffer_ptr), ctypes.byref(size))
+    def move_to(self, from_pos, to_pos):
+        libcc0.game_move_to(self.ptr, from_pos, to_pos)
 
-        n_pieces = buffer_ptr[0]
-        current_player = buffer_ptr[1]
-        first_players_pieces = [ buffer_ptr[i+2] for i in range(n_pieces) ]
-        second_players_pieces = [ buffer_ptr[i+2+n_pieces] for i in range(n_pieces) ]
+    def possible_moves_with_path(self, piece):
+        libcc0.game_possible_moves_with_path(self.ptr, piece)
+        return read_wasm_json()
 
-        libcc0.free_memory(buffer_ptr, size)
-
-        return current_player, first_players_pieces, second_players_pieces
-
-    def __del__(self): # Python does not guarantee that libcc0 still exist when this code is run. But we are going to shut down anyway.
-        if not self.no_drop:
-            libcc0.destroy_game(self.ptr)
-
-class MCTS:
-    def __init__(self, policy_fun=None):
-        if policy_fun is None:
-            self.ptr = libcc0.new_mcts_pure()
-            return
-
-        @ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float))
-        def _policy_fun(game_ptr, prior_out, value_out):
-            game = Game(game_ptr)
-            prior_logsoftmax, value = policy_fun(game)
-
-            for i, p in enumerate(prior_logsoftmax.reshape(-1).exp()): # PyTorch is row-major
-                prior_out[i] = float(p)
-
-            value_out[0] = float(value)
-
-        self.policy_fun = _policy_fun # prevent GC
-        self.ptr = libcc0.new_mcts(self.policy_fun)
-
-    def playout(self, game, ntimes):
-        libcc0.mcts_playout(self.ptr, game.ptr, ntimes)
-
-    def get_action_probs(self, temp=1e-3):
-        length = ctypes.c_uint32(0)
-        libcc0.mcts_get_action_probs(self.ptr, temp, None, None, ctypes.byref(length))
-
-        actions_buffer = (ctypes.c_uint32 * length.value)()
-        probs_buffer = (ctypes.c_float * length.value)()
-
-        libcc0.mcts_get_action_probs(self.ptr, temp, actions_buffer, probs_buffer, ctypes.byref(length))
-        return [ (*decode_action(actions_buffer[i]), probs_buffer[i]) for i in range(length.value) ]
-
-    def sample_action(self, exploration_prob, temperature):
-        action = libcc0.mcts_sample_action(self.ptr, exploration_prob, temperature)
-        return decode_action(action)
-
-    def chroot(self, old_pos, new_pos):
-        libcc0.mcts_chroot(self.ptr, encode_action(old_pos, new_pos))
-
-    def total_visits(self):
-        return libcc0.mcts_total_visits(self.ptr)
-
-    def root_value(self):
-        return libcc0.mcts_root_value(self.ptr)
+    def turn(self):
+        return libcc0.game_turn(self.ptr)
 
     def __del__(self):
-        libcc0.destroy_mcts(self.ptr)
+        libcc0.free_game(self.ptr)
 
 def set_random_seed(seed):
     libcc0.set_random_seed(seed)
+
+def alphabeta(game, depth):
+    libcc0.alphabeta(game.ptr, depth)
+    action = read_wasm_json()
+    return [action["from"], action["to"]]

@@ -53,11 +53,12 @@ fn sample_categorical(probs: impl Iterator<Item=f64>) -> usize {
 pub mod board;
 pub mod game;
 pub mod alphabeta;
+pub mod greedy;
 // pub mod mcts;
 
 
 #[no_mangle]
-static mut JSON_BUFFER: [u32; 3] = [0, 0, 0];
+static mut JSON_BUFFER: [usize; 3] = [0, 0, 0];
 
 // write to the json buffer. The client need to call free_json_buffer after reading it.
 unsafe fn write_json_buffer(value: &JsonValue) {
@@ -96,8 +97,22 @@ pub unsafe extern fn new_small_game() -> *mut game::Game {
 }
 
 #[no_mangle]
-pub unsafe extern fn destroy_game(game: *mut game::Game) {
+pub unsafe extern fn new_standard_game() -> *mut game::Game {
+    Box::leak(Box::new(game::Game::new(&board::STANDARD_BOARD)))
+}
+
+#[no_mangle]
+pub unsafe extern fn free_game(game: *mut game::Game) {
     let _ = Box::from_raw(game);
+}
+
+#[no_mangle]
+pub unsafe extern fn game_board_info(game: *mut game::Game) {
+    let game = &*game;
+    write_json_buffer(&json!({
+        "n_pieces": game.board.n_pieces,
+        "board_size": game.board.board_size,
+    }))
 }
 
 #[no_mangle]
@@ -152,6 +167,12 @@ pub unsafe extern fn game_possible_moves_with_path(game: *mut game::Game, piece:
 }
 
 #[no_mangle]
+pub unsafe extern fn game_turn(game: *mut game::Game) -> usize {
+    let game = &*game;
+    game.turn
+}
+
+#[no_mangle]
 pub unsafe extern fn alphabeta(game: *mut game::Game, depth: usize) {
     let game = &*game;
     let (_next_state, action) = alphabeta::alphabeta(game, depth);
@@ -161,3 +182,15 @@ pub unsafe extern fn alphabeta(game: *mut game::Game, depth: usize) {
         "path": action.path
     }));
 }
+
+#[no_mangle]
+pub unsafe extern fn greedy(game: *mut game::Game, temp: f64) {
+    let game = &*game;
+    let (_next_state, action) = greedy::greedy(game, temp);
+    write_json_buffer(&json!({
+        "from": action.from,
+        "to": action.to,
+        "path": action.path
+    }));
+}
+

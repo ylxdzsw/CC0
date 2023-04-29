@@ -166,6 +166,21 @@ impl Game {
 
         result
     }
+
+    // higher is better for p1
+    pub fn heuristic(&self) -> f64 {
+        let mut p1_dist = self.p1_distance();
+        if p1_dist <= self.board.min_distance {
+            p1_dist = 0 // enlarge the wining gap
+        }
+
+        let mut p2_dist = self.p2_distance();
+        if p2_dist <= self.board.min_distance {
+            p2_dist = 0
+        }
+
+        p2_dist as f64 - p1_dist as f64
+    }
 }
 
 #[cfg(test)]

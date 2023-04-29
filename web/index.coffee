@@ -29,7 +29,7 @@ window.player_menu = do ->
         document.querySelectorAll "option[value=\"i#{id}\"]"
             .remove()
 
-player_menu.add "Local Player", class
+player_menu.add "Human", class
     move: -> new Promise (resolve, reject) =>
         canvas.install_handler
             click: (pos) =>
@@ -61,6 +61,10 @@ player_menu.add "Local Player", class
 
 window.app =
     init: ->
+        document.querySelector '#temperature-slider'
+            .addEventListener 'change', =>
+                document.querySelector('#temperature-slider-label-num').textContent = do @get_temperature
+
         document.querySelector '#mctc-iter-slider'
             .addEventListener 'change', =>
                 document.querySelector('#mctc-iter-slider-label-num').textContent = do @get_mcts_iter
@@ -71,6 +75,10 @@ window.app =
 
         document.querySelector '#new-game-button'
             .addEventListener 'click', => do @new_game
+
+    get_temperature: ->
+        v = Number document.querySelector('#temperature-slider').value
+        Math.max 0.001, Math.min 10, 0.001 * Math.floor 1000 * v * v
 
     get_mcts_iter: ->
         v = Number document.querySelector('#mctc-iter-slider').value
@@ -93,6 +101,8 @@ window.app =
 
     new_game: ->
         board_type = document.querySelector('#board-type').value ? 'standard'
+
+        @game.free() if @game
         @game = new Game board_type
 
         canvas.init board_type
@@ -102,6 +112,7 @@ window.app =
         player2 = player_menu.new parseInt document.querySelector("#player-2").value.slice(1)
 
         loop
+            do @game.update_status_bar
             current_player = if @game.is_p1_moving_next() then player1 else player2
             [old_pos, new_pos] = await do current_player.move
             { path } = @pos_info old_pos
@@ -119,7 +130,20 @@ window.app =
                 when 3 then return @end_game 'tie'
 
     end_game: (msg) ->
+        do @game.update_status_bar
         console.log msg
+
+    status_bar_info: {}
+    update_status_bar: (info) ->
+        if info.reset
+            @status_bar_info = {}
+        else
+            Object.assign @status_bar_info, info
+
+        document.querySelector('#status-bar').textContent = Object.entries(@status_bar_info)
+            .filter ([k, v]) => v isnt null
+            .map ([k, v]) => "#{k}: #{v}"
+            .join ' | '
 
 
 window.replay = (records) ->
