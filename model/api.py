@@ -52,6 +52,9 @@ libcc0.game_possible_moves_with_path.restype = None
 libcc0.game_turn.argtypes = [ctypes.c_void_p]
 libcc0.game_turn.restype = ctypes.c_size_t
 
+libcc0.game_expand.argtypes = [ctypes.c_void_p]
+libcc0.game_expand.restype = None
+
 libcc0.alphabeta.argtypes = [ctypes.c_void_p, ctypes.c_size_t]
 libcc0.alphabeta.restype = None
 
@@ -115,6 +118,10 @@ class Game:
     def turn(self):
         return libcc0.game_turn(self.ptr)
 
+    def expand(self):
+        libcc0.game_expand(self.ptr)
+        return read_wasm_json()
+
     def __del__(self):
         libcc0.free_game(self.ptr)
 
@@ -123,5 +130,10 @@ def set_random_seed(seed):
 
 def alphabeta(game, depth):
     libcc0.alphabeta(game.ptr, depth)
+    action = read_wasm_json()
+    return [action["from"], action["to"]]
+
+def greedy(game, temperature):
+    libcc0.greedy(game.ptr, temperature)
     action = read_wasm_json()
     return [action["from"], action["to"]]

@@ -172,6 +172,27 @@ pub unsafe extern fn game_turn(game: *mut game::Game) -> usize {
     game.turn
 }
 
+// special method for training the model. Returns a list of chlidren pieces (omit turn info) and a list of their heuristic values
+#[no_mangle]
+pub unsafe extern fn game_expand(game: *mut game::Game) {
+    let game = &*game;
+    let (next_states, actions) = game.expand(true);
+    let (pieces, (values, actions)): (Vec<_>, (Vec<_>, Vec<_>)) = next_states.into_iter().zip(actions.into_iter())
+        .map(|(next_state, action)| {
+            let heuristic = next_state.heuristic();
+            let value = if heuristic >= 10. {
+                1.0
+            } else if heuristic <= -10. {
+                0.0
+            } else {
+                0.5 + heuristic / 20.
+            };
+            (next_state.pieces, (value, [action.from, action.to]))
+        })
+        .unzip();
+    write_json_buffer(&json!([pieces, values, actions]));
+}
+
 #[no_mangle]
 pub unsafe extern fn alphabeta(game: *mut game::Game, depth: usize) {
     let game = &*game;

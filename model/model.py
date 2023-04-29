@@ -18,15 +18,26 @@ class Model(torch.nn.Module):
         x = self.encoder(x.permute(1, 0, 2)) # (1 + 2*n_pieces, batch, hidden)
         x = x[0, :, :] # (batch, hidden)
         x = self.decoder(x) # (batch, 1)
-        return torch.sigmoid(x)
+        return torch.squeeze(x, 1)
 
-def encode_input(game):
+def encode_game(game):
     x = [0] if game.is_p1_moving_next() else [1]
 
     for piece in game.p1_pieces():
         x.append(piece + 2)
 
     for piece in game.p2_pieces():
+        x.append(piece + 2 + game.board_size)
+
+    return x
+
+def encode_child(game, child_pieces):
+    x = [1] if game.is_p1_moving_next() else [0]
+
+    for piece in child_pieces[:len(child_pieces)//2]:
+        x.append(piece + 2)
+
+    for piece in child_pieces[len(child_pieces)//2:]:
         x.append(piece + 2 + game.board_size)
 
     return x

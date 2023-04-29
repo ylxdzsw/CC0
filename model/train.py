@@ -1,109 +1,98 @@
 import torch
 import numpy as np
 from multiprocessing import Pool
-from api import Game, MCTS, set_random_seed
+from api import Game, set_random_seed, alphabeta, greedy
 from utils import save, load
-from model import Model, encode_input
+from model import Model, encode_game, encode_child
 
-# playout a game and collect data for training [(pieces, masks, probs, result)]
-# result means the winning rate (in -1 ~ 1 scale) of the player that is going to take action acroding to action_probs
-# TODO: augmentation by horizontal fliping?
-def self_play(board_type, model):
-    @torch.no_grad()
-    def policy_fun(game):
-        pieces, mask = encode_input(game)
-        pieces = torch.as_tensor(np.expand_dims(pieces, 0))
-        mask = torch.as_tensor(np.expand_dims(mask, 0))
-        policy, value = model(pieces, mask)
-        return torch.squeeze(policy, 0), torch.squeeze(value, 0)
+torch.multiprocessing.set_sharing_strategy('file_system')
 
+def gen_data(board_type, target_model):
     game = Game(board_type)
-    if model is None:
-        mcts = MCTS()
-    else:
-        mcts = MCTS(policy_fun)
 
-    data = [] # (pieces, masks, probs)
+    data = [] # (encoded_inputs, state_value)
 
-    while True:
-        status = game.get_status()
-        if status != 0:
-            if status == 1:
-                return [ (*x, 1 if i%2 == 0 else -1) for i, x in enumerate(data) ]
-            if status == 2:
-                return [ (*x, -1 if i%2 == 0 else 1) for i, x in enumerate(data) ]
-            if status == 3:
-                return [ (*x, 0) for x in data ]
-            raise Exception("unknown status")
+    while game.get_status() == 0:
+        if game.turn() >= 8 * game.n_pieces: # force end overly long games
+            break
 
-        if model is None:
-            mcts.playout(game, 8000 - mcts.total_visits())
-        else:
-            mcts.playout(game, 2000 - mcts.total_visits())
+        child_pieces, child_values, actions = game.expand()
 
-        action_probs = mcts.get_action_probs(1.0)
-        pieces, mask, probs = encode_input(game, action_probs)
+        if target_model != None:
+            for i, pieces in enumerate(child_pieces):
+                encoded = torch.unsqueeze(torch.tensor(encode_child(game, pieces)), 0)
+                child_values[i] = target_model(encoded).item()
 
-        data.append((pieces, mask, probs))
+        probs_unnormalized = torch.tensor(child_values, dtype=torch.float)
+        if game.is_p2_moving_next():
+            probs_unnormalized = 1 - probs_unnormalized
+        probs = torch.softmax(probs_unnormalized / 0.1, 0)
 
-        # state = game.dump()
-        # value = mcts.root_value()
-        # print(state, action_probs, value)
+        if game.turn() >= 2 * game.n_pieces: # skip first several moves
+            updated_value = (torch.tensor(child_values, dtype=torch.float) * probs).sum().item()
+            data.append((encode_game(game), updated_value))
 
-        old_pos, new_pos = mcts.sample_action(0.1, 1.0)
-        game.do_move(old_pos, new_pos)
-        mcts.chroot(old_pos, new_pos)
+        i = torch.multinomial(probs, 1).item()
+        from_pos, to_pos = actions[i]
+        game.move_to(from_pos, to_pos)
+
+    return data
 
 def worker_init(model_path):
-    global model
-    if model_path is None:
-        model = None
-        return
-    torch.set_num_threads(1)
     import os
     set_random_seed(os.getpid() * 7 + 39393)
-    model = torch.jit.load(model_path).eval()
+
+    global target_model
+    if model_path is None:
+        target_model = None
+    else:
+        torch.set_num_threads(1)
+        target_model = torch.jit.load(model_path).eval()
 
 def worker_run(board_type):
-    global model
-    return self_play(board_type, model)
+    global target_model
+    return gen_data(board_type, target_model)
 
-# inference performance: CUDA: 60 playouts/s, SingleThreadCPU: 80 playouts/s, MultiThreadCPU: 105 playouts/s but uses 40% of all 16 cores.
-# TorchScript jit further gives around 10% performance gain.
-# Therefore we choose to play multiple games concurrently, each use only one thread.
-def collect_self_play_data(model, n=1000, board_type="standard"):
-    if model != None:
-        model.cpu().save('scripted_model.pt')
-        with Pool(80, initializer=worker_init, initargs=('scripted_model.pt',)) as pool:
+def collect_data(target_model, n, board_type="standard"):
+    if target_model != None:
+        target_model.cpu().save('scripted_model.pt')
+        with Pool(128, initializer=worker_init, initargs=('scripted_model.pt',)) as pool:
             data_batches = pool.map(worker_run, (board_type for _ in range(n)), chunksize=1)
-        model.cuda()
+        target_model.cuda()
     else:
-        with Pool(80, initializer=worker_init, initargs=(None,)) as pool:
+        with Pool(128, initializer=worker_init, initargs=(None,)) as pool:
             data_batches = pool.map(worker_run, (board_type for _ in range(n)), chunksize=1)
 
     return [ x for batch in data_batches for x in batch ]
 
-def random_batch(data, batch_size):
-    return *(np.stack(d, axis=0) for d in zip(*( data[i] for i in np.random.randint(len(data), size=batch_size) ))),
-
 def train(model, optimizer, data):
     model.train()
 
-    acc = 0, 0
-    for epoch in range(len(data) // 8):
-        pieces, masks, probs, scores = ( torch.from_numpy(x).cuda() for x in random_batch(data, 64) )
-        policy, value = model(pieces, masks)
-        policy_loss = -torch.mean(torch.sum(probs * policy, 1))
-        value_loss = torch.nn.functional.mse_loss(value, scores.float())
+    class Dataset(torch.utils.data.Dataset):
+        def __init__(self, data):
+            self.data = data
 
-        (policy_loss + value_loss).backward()
+        def __len__(self):
+            return len(self.data)
+
+        def __getitem__(self, index):
+            x = np.array(self.data[index][0], dtype=np.int64)
+            y = np.array(self.data[index][1], dtype=np.float32)
+            return x, y
+
+    dataloader = torch.utils.data.DataLoader(Dataset(data), batch_size=64, shuffle=True)
+    avg_loss = 0
+    for i, (encoded_states, values) in enumerate(dataloader):
+        predicted_values = model(encoded_states.cuda())
+        loss = torch.nn.functional.mse_loss(predicted_values, values.cuda())
+        avg_loss += loss.item() / 1000
+        loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), .6)
         optimizer.step()
 
-        acc = acc[0] + policy_loss.item() / 1000, acc[1] + value_loss.item() / 1000
-        if epoch % 1000 == 999:
-            print(*acc)
-            acc = 0, 0
+        if i % 1000 == 999:
+            print(avg_loss)
+            avg_loss = 0
 
 # The argument can be either a checkpoint, or the board type
 if __name__ == '__main__':
@@ -116,8 +105,8 @@ if __name__ == '__main__':
         board_type = sys.argv[1]
 
     dummy_game = Game(board_type)
-    model = torch.jit.script(Model(dummy_game.board_size, dummy_game.n_pieces).cuda())
-    optimizer = torch.optim.Adam(model.parameters(), lr=2e-5, weight_decay=2e-6)
+    model = torch.jit.script(Model(dummy_game.board_size).cuda())
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
     r = -1
 
     try:
@@ -135,21 +124,18 @@ if __name__ == '__main__':
         except:
             print("collecting data")
             if r == 0:
-                data = collect_self_play_data(None, 2000, board_type)
+                data = collect_data(None, 1000000, board_type)
             else:
-                data = collect_self_play_data(model, 800, board_type)
+                data = collect_data(model, 50000, board_type)
             save(data, "data_{:03}".format(r))
 
-        l = r // 2
-        print(f"load last {l} rounds data")
-        for i in range(r-l, r):
+        print(f"load last 5 rounds data")
+        for i in range(r-5, r):
             try:
                 data.extend(load("data_{:03}".format(i)))
             except:
                 print("skip data_{:03}".format(i))
                 pass
-        if r < 5:
-            data.extend(load("data_000"))
 
         print("training model")
         train(model, optimizer, data)
