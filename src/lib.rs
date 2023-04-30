@@ -177,7 +177,7 @@ pub unsafe extern fn game_turn(game: *mut game::Game) -> usize {
 pub unsafe extern fn game_expand(game: *mut game::Game) {
     let game = &*game;
     let (next_states, actions) = game.expand(true);
-    let (pieces, (values, actions)): (Vec<_>, (Vec<_>, Vec<_>)) = next_states.into_iter().zip(actions.into_iter())
+    let (pieces, (values, (actions, terminals))): (Vec<_>, (Vec<_>, (Vec <_>, Vec<_>))) = next_states.into_iter().zip(actions.into_iter())
         .map(|(next_state, action)| {
             let heuristic = next_state.heuristic();
             let value = if heuristic >= 10. {
@@ -187,10 +187,11 @@ pub unsafe extern fn game_expand(game: *mut game::Game) {
             } else {
                 0.5 + heuristic / 20.
             };
-            (next_state.pieces, (value, [action.from, action.to]))
+            let is_terminal = next_state.expand(false).0.is_empty();
+            (next_state.pieces, (value, ([action.from, action.to], is_terminal)))
         })
         .unzip();
-    write_json_buffer(&json!([pieces, values, actions]));
+    write_json_buffer(&json!([pieces, values, actions, terminals]));
 }
 
 #[no_mangle]

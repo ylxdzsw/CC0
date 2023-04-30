@@ -34,10 +34,10 @@ def encode_game(game):
 def encode_child(game, child_pieces):
     x = [1] if game.is_p1_moving_next() else [0]
 
-    for piece in child_pieces[:len(child_pieces)//2]:
+    for piece in child_pieces[:game.n_pieces]:
         x.append(piece + 2)
 
-    for piece in child_pieces[len(child_pieces)//2:]:
+    for piece in child_pieces[game.n_pieces:]:
         x.append(piece + 2 + game.board_size)
 
     return x

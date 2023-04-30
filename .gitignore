@@ -1,14 +1,4 @@
-.vscode
 Cargo.lock
 target
-build
-package-lock.json
-node_modules
-dist
 *.wasm
 *.onnx
-data
-data_*
-model_*
-checkpoint_*
-scripted_model.pt

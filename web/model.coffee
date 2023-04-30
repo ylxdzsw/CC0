@@ -1,45 +1,58 @@
 do ->
     sess = null
 
-    encode_input = (game) ->
-        [board_size, n_pieces] = [game.board_size, game.n_pieces]
-        { current_player, first_players_pieces, second_players_pieces } = do game.dump
-        if current_player is 1
-            player_offset = 0
-            [self_pieces, oppo_pieces] = [first_players_pieces, second_players_pieces]
-        else
-            player_offset = 2 * game.board_size
-            [self_pieces, oppo_pieces] = [second_players_pieces, first_players_pieces]
-        pieces = []
-        pieces.push i + player_offset for i in self_pieces
-        pieces.push i + player_offset + game.board_size for i in oppo_pieces
-        mask = (0 for i in [0...game.n_pieces * game.board_size])
-        for [pos, moves] in do game.all_possible_moves
-            i = self_pieces.findIndex (x) -> x is pos
-            mask[i * game.board_size + j] = 1 for j in moves
-        [pieces, mask]
+    encode_game = (game) ->
+        x = if game.is_p1_moving_next() then [0] else [1]
+        for piece in game.p1_pieces()
+            x.push piece + 2
+        for piece in game.p2_pieces()
+            x.push piece + 2 + game.board_size
+        x
+
+    encode_child = (game, child_pieces) ->
+        x = if game.is_p1_moving_next() then [1] else [0]
+        for piece in child_pieces[..game.n_pieces]
+            x.push piece + 2
+        for piece in child_pieces[game.n_pieces..]
+            x.push piece + 2 + game.board_size
+        x
 
     await new Promise (resolve) ->
         document.querySelector '#download-model-button'
             .addEventListener 'click', ->
                 if not sess?
                     @disabled = true
-                    console.log 'downloading'
+                    document.querySelector '#download-model-status'
+                        .classList.remove 'hidden'
                     sess = await ort.InferenceSession.create 'model.onnx'
-                    console.log 'downloading finihsed'
+                    window.sess = sess
+                    document.querySelector '#download-model-status'
+                        .innerHTML = 'Model loaded'
                     do resolve
 
-    player_menu.add "Transformer 18M", class
-        move: ->
-            tree = new MCTS
-            { cont_ptr, game } = tree.start_try_playout app.game, do app.get_mcts_iter
+    window.model = {
+        score_game: (game) ->
+            input = new ort.Tensor 'int32', encode_game(game), [1, 2 * game.n_pieces + 1]
+            output = await sess.run encoded_state: input
+            output.value.data[0]
 
-            while cont_ptr
-                [pieces, mask] = encode_input game
-                pieces_tensor = new ort.Tensor 'int32', pieces, [1, 2 * game.n_pieces]
-                mask_tensor = new ort.Tensor 'int32', mask, [1, game.n_pieces * game.board_size]
-                { action_probs, value } = await sess.run { pieces: pieces_tensor, mask: mask_tensor }
-                { cont_ptr, game } = tree.continue_try_playout cont_ptr, game, action_probs.data, value.data[0]
-                await sleep 0
+        score_child: (game, child_pieces) ->
+            input = new ort.Tensor 'int32', encode_child(game, child_pieces), [1, 2 * game.n_pieces + 1]
+            output = await sess.run encoded_state: input
+            output.value.data[0]
+    }
 
-            tree.sample_action 0, 0.001
+    # player_menu.add "Transformer 18M", class
+    #     move: ->
+    #         tree = new MCTS
+    #         { cont_ptr, game } = tree.start_try_playout app.game, do app.get_mcts_iter
+
+    #         while cont_ptr
+    #             [pieces, mask] = encode_input game
+    #             pieces_tensor = new ort.Tensor 'int32', pieces, [1, 2 * game.n_pieces]
+    #             mask_tensor = new ort.Tensor 'int32', mask, [1, game.n_pieces * game.board_size]
+    #             { action_probs, value } = await sess.run { pieces: pieces_tensor, mask: mask_tensor }
+    #             { cont_ptr, game } = tree.continue_try_playout cont_ptr, game, action_probs.data, value.data[0]
+    #             await sleep 0
+
+    #         tree.sample_action 0, 0.001

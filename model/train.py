@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 from multiprocessing import Pool
-from api import Game, set_random_seed, alphabeta, greedy
+from api import Game, set_random_seed
 from utils import save, load
 from model import Model, encode_game, encode_child
 
@@ -16,10 +16,12 @@ def gen_data(board_type, target_model):
         if game.turn() >= 8 * game.n_pieces: # force end overly long games
             break
 
-        child_pieces, child_values, actions = game.expand()
+        child_pieces, child_values, actions, terminals = game.expand()
 
         if target_model != None:
             for i, pieces in enumerate(child_pieces):
+                if terminals[i]:
+                    continue # use the true reward
                 encoded = torch.unsqueeze(torch.tensor(encode_child(game, pieces)), 0)
                 child_values[i] = target_model(encoded).item()
 
@@ -30,7 +32,10 @@ def gen_data(board_type, target_model):
 
         if game.turn() >= 2 * game.n_pieces: # skip first several moves
             updated_value = (torch.tensor(child_values, dtype=torch.float) * probs).sum().item()
-            data.append((encode_game(game), updated_value))
+            if 0.48 < updated_value < 0.52:
+                pass # skip near-draw games
+            else:
+                data.append((encode_game(game), updated_value))
 
         i = torch.multinomial(probs, 1).item()
         from_pos, to_pos = actions[i]
@@ -80,19 +85,14 @@ def train(model, optimizer, data):
             y = np.array(self.data[index][1], dtype=np.float32)
             return x, y
 
-    dataloader = torch.utils.data.DataLoader(Dataset(data), batch_size=64, shuffle=True)
-    avg_loss = 0
-    for i, (encoded_states, values) in enumerate(dataloader):
+    dataloader = torch.utils.data.DataLoader(Dataset(data), batch_size=1024, shuffle=True)
+    for encoded_states, values in dataloader:
         predicted_values = model(encoded_states.cuda())
         loss = torch.nn.functional.mse_loss(predicted_values, values.cuda())
-        avg_loss += loss.item() / 1000
+        print(loss.item())
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), .6)
         optimizer.step()
-
-        if i % 1000 == 999:
-            print(avg_loss)
-            avg_loss = 0
 
 # The argument can be either a checkpoint, or the board type
 if __name__ == '__main__':
@@ -140,3 +140,6 @@ if __name__ == '__main__':
         print("training model")
         train(model, optimizer, data)
         save({ 'r': r, 'board_type': board_type, 'model_state_dict': model.state_dict(), 'optimizer_state_dict': optimizer.state_dict() }, "model_{:03}".format(r))
+
+        if r > 100:
+            break

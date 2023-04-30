@@ -34,6 +34,12 @@ do ->
                 else
                     throw 0
 
+            Object.assign @, @board_info()
+
+        board_info: ->
+            cc0.game_board_info @ptr
+            do read_wasm_json
+
         possible_moves_with_path: (pos) ->
             cc0.game_possible_moves_with_path @ptr, pos
             do read_wasm_json
@@ -71,6 +77,10 @@ do ->
                     when 1 then "Player 1 won"
                     when 2 then "Player 2 won"
                     when 3 then "Tie"
+
+            if window.model
+                score = await window.model.score_game @
+                app.update_status_bar "Model Estimation": (100 * score).toFixed 2
 
         free: ->
             cc0.free_game @ptr
