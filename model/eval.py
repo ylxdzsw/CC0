@@ -1,45 +1,23 @@
 import torch
 import numpy as np
-from api import Game, MCTS, set_random_seed
-from utils import save, load
-from model import Model, encode_input
+from api import Game
+from utils import load
+from model import Model, re_encode
 
 import sys
 
 checkpoint = load(sys.argv[1])
 board_type = checkpoint['board_type']
 dummy_game = Game(board_type)
-model = torch.jit.script(Model(dummy_game.board_size, dummy_game.n_pieces))
+model = Model(dummy_game.board_size)
 model.load_state_dict(checkpoint['model_state_dict'])
-model.cpu().eval()
+r = checkpoint['r']
 
-@torch.no_grad()
-def policy_fun(game):
-    pieces, mask = encode_input(game)
-    pieces = torch.as_tensor(np.expand_dims(pieces, 0))
-    mask = torch.as_tensor(np.expand_dims(mask, 0))
-    policy, value = model(pieces, mask)
-    return torch.squeeze(policy, 0), torch.squeeze(value, 0)
+data = load('data_{:03}'.format(r))[:256]
 
-game = Game(board_type)
-mcts = MCTS(policy_fun)
-
-while True:
-    status = game.get_status()
-    if status != 0:
-        if status == 1:
-            print("player 1 won")
-        if status == 2:
-            print("player 2 won")
-        if status == 3:
-            print("tie")
-        break
-
-    mcts.playout(game, 8000 - mcts.total_visits())
-    value = mcts.root_value()
-    old_pos, new_pos = mcts.sample_action(0, 0.1)
-
-    print("move from {} to {}. value: {}".format(old_pos, new_pos, value))
-
-    game.do_move(old_pos, new_pos)
-    mcts.chroot(old_pos, new_pos)
+for encoded_state, y in data:
+    x = np.array(encoded_state, dtype=np.int64)
+    x = re_encode(x, 73)
+    x = np.expand_dims(x, 0)
+    p = model(torch.from_numpy(x))
+    print(encoded_state, 0.5 + p.item() / 2, y)

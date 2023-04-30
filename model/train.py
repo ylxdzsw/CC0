@@ -3,7 +3,7 @@ import numpy as np
 from multiprocessing import Pool
 from api import Game, set_random_seed
 from utils import save, load
-from model import Model, encode_game, encode_child
+from model import Model, encode_game, encode_child, re_encode
 
 torch.multiprocessing.set_sharing_strategy('file_system')
 
@@ -28,7 +28,7 @@ def gen_data(board_type, target_model):
         probs_unnormalized = torch.tensor(child_values, dtype=torch.float)
         if game.is_p2_moving_next():
             probs_unnormalized = 1 - probs_unnormalized
-        probs = torch.softmax(probs_unnormalized / 0.1, 0)
+        probs = torch.softmax(probs_unnormalized / 0.02, 0)
 
         if game.turn() >= 2 * game.n_pieces: # skip first several moves
             updated_value = (torch.tensor(child_values, dtype=torch.float) * probs).sum().item()
@@ -82,17 +82,22 @@ def train(model, optimizer, data):
 
         def __getitem__(self, index):
             x = np.array(self.data[index][0], dtype=np.int64)
+            x = re_encode(x, 73)
             y = np.array(self.data[index][1], dtype=np.float32)
             return x, y
 
-    dataloader = torch.utils.data.DataLoader(Dataset(data), batch_size=1024, shuffle=True)
-    for encoded_states, values in dataloader:
-        predicted_values = model(encoded_states.cuda())
-        loss = torch.nn.functional.mse_loss(predicted_values, values.cuda())
-        print(loss.item())
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), .6)
-        optimizer.step()
+    dataloader = torch.utils.data.DataLoader(Dataset(data), batch_size=32, shuffle=False)
+    loss_fn = torch.nn.MSELoss(reduction="mean")
+
+    for epoch in range(10):
+        for encoded_states, values in dataloader:
+            predicted_values = model(encoded_states.cuda())
+            loss = loss_fn(predicted_values, values.cuda())
+            print(loss.item())
+            optimizer.zero_grad()
+            loss.backward()
+            # torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            optimizer.step()
 
 # The argument can be either a checkpoint, or the board type
 if __name__ == '__main__':
@@ -105,8 +110,8 @@ if __name__ == '__main__':
         board_type = sys.argv[1]
 
     dummy_game = Game(board_type)
-    model = torch.jit.script(Model(dummy_game.board_size).cuda())
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+    model = Model(dummy_game.board_size).cuda()
+    optimizer = torch.optim.Adam(model.parameters(), lr=2e-5)
     r = -1
 
     try:
@@ -141,5 +146,4 @@ if __name__ == '__main__':
         train(model, optimizer, data)
         save({ 'r': r, 'board_type': board_type, 'model_state_dict': model.state_dict(), 'optimizer_state_dict': optimizer.state_dict() }, "model_{:03}".format(r))
 
-        if r > 100:
-            break
+        break
