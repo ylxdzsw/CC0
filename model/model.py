@@ -25,11 +25,37 @@ class Transformer(torch.nn.Module):
         x = self.decoder(x) # (batch, 1)
         return torch.squeeze(x, 1)
 
+    @classmethod
+    def encode_game(_cls, game):
+        x = [0] if game.is_p1_moving_next() else [1]
+
+        for piece in game.p1_pieces():
+            x.append(piece + 2)
+
+        for piece in game.p2_pieces():
+            x.append(piece + 2 + game.board_size)
+
+        return x
+
+    @classmethod
+    def encode_child(_cls, game, child_pieces):
+        x = [1] if game.is_p1_moving_next() else [0]
+
+        for piece in child_pieces[:game.n_pieces]:
+            x.append(piece + 2)
+
+        for piece in child_pieces[game.n_pieces:]:
+            x.append(piece + 2 + game.board_size)
+
+        return x
+
 class MLP(torch.nn.Module):
     def __init__(self, board_size):
         super(MLP, self).__init__()
         self.layers = torch.nn.Sequential(
-            torch.nn.Linear(1 + 2 * board_size, 1024),
+            torch.nn.Linear(1 + 2 * board_size, 256),
+            torch.nn.ReLU(),
+            torch.nn.Linear(256, 1024),
             torch.nn.ReLU(),
             torch.nn.Linear(1024, 256),
             torch.nn.ReLU(),
@@ -37,36 +63,37 @@ class MLP(torch.nn.Module):
         )
 
     def forward(self, x):
-        return torch.squeeze(self.layers(x), 1)
+        x = self.layers(x)
+        return torch.squeeze(x, 1)
+
+    @classmethod
+    def encode_game(_cls, game):
+        x = [0] * (1 + 2 * game.board_size)
+
+        if game.is_p1_moving_next():
+            x[0] = 1
+
+        for piece in game.p1_pieces():
+            x[1 + piece] = 1
+
+        for piece in game.p2_pieces():
+            x[1 + game.board_size + piece] = 1
+
+        return x
+
+    @classmethod
+    def encode_child(_cls, game, child_pieces):
+        x = [0] * (1 + 2 * game.board_size)
+
+        if game.is_p2_moving_next():
+            x[0] = 1
+
+        for piece in child_pieces[:game.n_pieces]:
+            x[1 + piece] = 1
+
+        for piece in child_pieces[game.n_pieces:]:
+            x[1 + game.board_size + piece] = 1
+
+        return x
 
 Model = MLP
-
-def encode_game(game):
-    x = [0] if game.is_p1_moving_next() else [1]
-
-    for piece in game.p1_pieces():
-        x.append(piece + 2)
-
-    for piece in game.p2_pieces():
-        x.append(piece + 2 + game.board_size)
-
-    return x
-
-def encode_child(game, child_pieces):
-    x = [1] if game.is_p1_moving_next() else [0]
-
-    for piece in child_pieces[:game.n_pieces]:
-        x.append(piece + 2)
-
-    for piece in child_pieces[game.n_pieces:]:
-        x.append(piece + 2 + game.board_size)
-
-    return x
-
-# turn transformer encode into mlp encode
-def re_encode(encoded, board_size):
-    x = np.zeros(1 + 2 * board_size, dtype=np.float32)
-    x[0] = encoded[0]
-    for p in encoded[1:]:
-        x[p] = 1
-    return x

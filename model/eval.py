@@ -2,7 +2,7 @@ import torch
 import numpy as np
 from api import Game
 from utils import load
-from model import Model, re_encode
+from model import Model
 
 import sys
 
@@ -16,8 +16,7 @@ r = checkpoint['r']
 data = load('data_{:03}'.format(r))[:256]
 
 for encoded_state, y in data:
-    x = np.array(encoded_state, dtype=np.int64)
-    x = re_encode(x, 73)
+    x = np.array(encoded_state)
     x = np.expand_dims(x, 0)
-    p = model(torch.from_numpy(x))
-    print(encoded_state, 0.5 + p.item() / 2, y)
+    p = model(torch.tensor(x, dtype=torch.float))
+    print(p.item(), y)
