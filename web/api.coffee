@@ -6,7 +6,7 @@ do ->
     cc0.set_random_seed Math.floor Math.random() * (1 << 30)
 
     # reads the json buffer and returns the parsed json
-    read_wasm_json = (parse = true) ->
+    window.read_wasm_json = (parse = true) ->
         [ptr, len] = new Uint32Array cc0.memory.buffer, cc0.JSON_BUFFER, 2
         str = new TextDecoder().decode new Uint8Array cc0.memory.buffer, ptr, len
         do cc0.free_json_buffer
@@ -16,7 +16,7 @@ do ->
             str
 
     # write to the json buffer. An API must be used to let the engine read and free the buffer
-    write_wasm_json = (e, stringify = true) ->
+    window.write_wasm_json = (e, stringify = true) ->
         e = JSON.stringify e if stringify
         encoded = new TextEncoder().encode e
         cc0.alloc_json_buffer encoded.length

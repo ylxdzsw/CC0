@@ -181,6 +181,18 @@ impl Game {
 
         p2_dist as f64 - p1_dist as f64
     }
+
+    pub fn key(&self) -> Vec<u8> {
+        let mut result = vec![self.turn as u8];
+        result.extend_from_slice(&self.pieces);
+        result
+    }
+
+    pub fn from_key(proto: &Game, key: &[u8]) {
+        let mut game = Game::new(&proto.board);
+        game.turn = key[0] as _;
+        game.pieces = key[1..].to_vec();
+    }
 }
 
 #[cfg(test)]
