@@ -188,22 +188,3 @@ impl Game {
         game
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use crate::board::SMALL_BOARD;
-
-    use super::*;
-
-    #[test]
-    fn game_test_1() {
-        let mut game = Game::new(&SMALL_BOARD);
-
-        game.p1_pieces_slice_mut().copy_from_slice(&[3, 4, 5, 9, 10, 11]);
-
-        let possible_moves = game.possible_moves_with_path(4);
-        println!("{:?}", possible_moves);
-    }
-}
-
-
