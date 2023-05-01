@@ -13,7 +13,10 @@ model = Model(dummy_game.board_size)
 model.load_state_dict(checkpoint['model_state_dict'])
 r = checkpoint['r']
 
-data = load('data_{:03}'.format(r))[:256]
+if len(sys.argv) > 2:
+    data = load(sys.argv[2])[:256]
+else:
+    data = load('data_{:03}'.format(r))[:256]
 
 for encoded_state, y in data:
     x = np.array(encoded_state)

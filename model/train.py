@@ -39,7 +39,10 @@ def gen_data(board_type):
             else:
                 data.append((Model.encode_game(game), updated_value))
 
-        i = torch.multinomial(probs, 1).item()
+        if np.random.rand() < 0.05:
+            i = np.random.randint(len(actions))
+        else:
+            i = torch.multinomial(probs, 1).item()
         game.move_to(*actions[i])
 
     return data
@@ -82,21 +85,21 @@ def train(model, optimizer, data):
             y = np.array(self.data[index][1], dtype=np.float32)
             return x, y
 
-    dataloader = torch.utils.data.DataLoader(Dataset(data), batch_size=64, shuffle=True)
-    for _ in range(2):
-        i, total_loss = 0, 0
-        for encoded_states, values in dataloader:
-            predicted_values = model(encoded_states.cuda())
-            loss = torch.nn.functional.mse_loss(predicted_values, values.cuda())
-            optimizer.zero_grad() # important! default is accumulation
-            loss.backward()
-            # torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-            optimizer.step()
+    dataloader = torch.utils.data.DataLoader(Dataset(data), batch_size=256, shuffle=True)
+    i, total_loss = 0, 0
+    for encoded_states, values in dataloader:
+        predicted_values = model(encoded_states.cuda())
+        loss = torch.nn.functional.mse_loss(predicted_values, values.cuda())
+        optimizer.zero_grad() # important! default is accumulation
+        loss.backward()
+        # torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+        optimizer.step()
 
-            total_loss += loss.item() / 1000
-            i += 1
-            if i % 1000 == 0:
-                print(total_loss, flush=True)
+        total_loss += loss.item() / 1000
+        i += 1
+        if i % 1000 == 0:
+            print(total_loss, flush=True)
+            total_loss = 0
 
 # The argument can be either a checkpoint, or the board type
 if __name__ == '__main__':
@@ -110,7 +113,7 @@ if __name__ == '__main__':
 
     dummy_game = Game(board_type)
     model = torch.jit.script(Model(dummy_game.board_size).cuda())
-    optimizer = torch.optim.Adam(model.parameters(), lr=2e-5)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-5)
     r = -1
 
     try:
@@ -128,9 +131,9 @@ if __name__ == '__main__':
         except:
             print("collecting data")
             if r == 0:
-                data = collect_data(None, 10000, board_type)
+                data = collect_data(None, 200000, board_type)
             else:
-                data = collect_data(model, 500, board_type)
+                data = collect_data(model, 50000, board_type)
             save(data, "data_{:03}".format(r))
 
         print(f"load last 5 rounds data")
@@ -145,5 +148,5 @@ if __name__ == '__main__':
         train(model, optimizer, data)
         save({ 'r': r, 'board_type': board_type, 'model_state_dict': model.state_dict(), 'optimizer_state_dict': optimizer.state_dict() }, "model_{:03}".format(r))
 
-        if r > 10:
+        if r > 20:
             break

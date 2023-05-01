@@ -15,7 +15,7 @@ model.load_state_dict(checkpoint['model_state_dict'])
 r = checkpoint['r']
 
 dummy_data = load('data_{:03}'.format(r))[0]
-encoded_state = torch.tensor(np.expand_dims(dummy_data[0], 0), dtype=torch.int32)
+encoded_state = torch.tensor(np.expand_dims(dummy_data[0], 0), dtype=torch.float)
 
 torch.onnx.export(
     model,

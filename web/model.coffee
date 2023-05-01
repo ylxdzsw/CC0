@@ -2,19 +2,31 @@ do ->
     sess = null
 
     encode_game = (game) ->
-        x = if game.is_p1_moving_next() then [0] else [1]
+        x = Array(1 + 2 * game.board_size).fill 0
+
+        if game.is_p1_moving_next()
+            x[0] = 1
+
         for piece in game.p1_pieces()
-            x.push piece + 2
+            x[1 + piece] = 1
+
         for piece in game.p2_pieces()
-            x.push piece + 2 + game.board_size
+            x[1 + game.board_size + piece] = 1
+
         x
 
     encode_child = (game, child_pieces) ->
-        x = if game.is_p1_moving_next() then [1] else [0]
+        x = Array(1 + 2 * game.board_size).fill 0
+
+        if game.is_p2_moving_next()
+            x[0] = 1
+
         for piece in child_pieces[..game.n_pieces]
-            x.push piece + 2
+            x[1 + piece] = 1
+
         for piece in child_pieces[game.n_pieces..]
-            x.push piece + 2 + game.board_size
+            x[1 + game.board_size + piece] = 1
+
         x
 
     await new Promise (resolve) ->
@@ -25,19 +37,18 @@ do ->
                     document.querySelector '#download-model-status'
                         .classList.remove 'hidden'
                     sess = await ort.InferenceSession.create 'model.onnx'
-                    window.sess = sess
                     document.querySelector '#download-model-status'
                         .innerHTML = 'Model loaded'
                     do resolve
 
     window.model = {
         score_game: (game) ->
-            input = new ort.Tensor 'int32', encode_game(game), [1, 2 * game.n_pieces + 1]
+            input = new ort.Tensor 'float32', encode_game(game), [1, 1 + 2 * game.board_size]
             output = await sess.run encoded_state: input
             output.value.data[0]
 
         score_child: (game, child_pieces) ->
-            input = new ort.Tensor 'int32', encode_child(game, child_pieces), [1, 2 * game.n_pieces + 1]
+            input = new ort.Tensor 'float32', encode_child(game, child_pieces), [1, 1 + 2 * game.board_size]
             output = await sess.run encoded_state: input
             output.value.data[0]
     }

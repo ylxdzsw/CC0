@@ -53,13 +53,13 @@ class MLP(torch.nn.Module):
     def __init__(self, board_size):
         super(MLP, self).__init__()
         self.layers = torch.nn.Sequential(
-            torch.nn.Linear(1 + 2 * board_size, 256),
+            torch.nn.Linear(1 + 2 * board_size, 1024),
             torch.nn.ReLU(),
-            torch.nn.Linear(256, 1024),
+            torch.nn.Linear(1024, 4096),
             torch.nn.ReLU(),
-            torch.nn.Linear(1024, 256),
+            torch.nn.Linear(4096, 1024),
             torch.nn.ReLU(),
-            torch.nn.Linear(256, 1),
+            torch.nn.Linear(1024, 1),
         )
 
     def forward(self, x):
