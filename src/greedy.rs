@@ -34,7 +34,7 @@ pub fn greedy_poll(game: &Game, temp: f64, score_map: &BTreeMap<Vec<u8>, f64>) -
 
     let mut values: Vec<_> = next_states.iter().map(|g| score_map[&g.key()]).collect();
     if game.is_p2_moving_next() {
-        values.iter_mut().for_each(|x| *x = -*x);
+        values.iter_mut().for_each(|x| *x = 1. - *x);
     }
     softmax(&mut values, temp);
 

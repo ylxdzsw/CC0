@@ -79,7 +79,7 @@ do ->
                     when 3 then "Tie"
 
             if window.model
-                score = await window.model.score_game @
+                score = await window.model.score @
                 app.update_status_bar "Model Estimation": (100 * score).toFixed 2
 
         free: ->

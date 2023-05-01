@@ -15,8 +15,8 @@ def gen_data(board_type):
     data = [] # (encoded_inputs, state_value)
 
     while game.get_status() == 0:
-        if game.turn() >= 8 * game.n_pieces: # force end overly long games
-            break
+        if game.turn() >= 10 * game.n_pieces: # force end overly long games
+            return []
 
         child_pieces, child_values, actions, terminals = game.expand()
 
@@ -39,7 +39,7 @@ def gen_data(board_type):
             else:
                 data.append((Model.encode_game(game), updated_value))
 
-        if np.random.rand() < 0.05:
+        if np.random.rand() < 0.1:
             i = np.random.randint(len(actions))
         else:
             i = torch.multinomial(probs, 1).item()

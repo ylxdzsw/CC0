@@ -3,7 +3,7 @@
 
 use std::collections::BTreeMap;
 
-use serde_json::{json, Value as JsonValue, Value::Null as JsonNull};
+use serde_json::{json, Value as JsonValue};
 
 type Position = u8; // huge board (rank 6) have 253 slots, u8 is just perfect.
 
@@ -206,6 +206,44 @@ pub unsafe extern fn alphabeta(game: *mut game::Game, depth: usize) {
         "path": action.path
     }));
 }
+
+#[no_mangle]
+pub unsafe extern fn alphabeta_poll(game: *mut game::Game, depth: usize, mut sess: *mut BTreeMap<Vec<u8>, f64>) -> *mut BTreeMap<Vec<u8>, f64> {
+    let game = &*game;
+    let first_call = sess.is_null();
+
+    if first_call {
+        sess = Box::leak(Box::new(BTreeMap::new()));
+    }
+    let map = &mut *sess;
+
+    if !first_call {
+        let data = read_json_buffer().unwrap();
+        for x in data.as_array().unwrap().iter() {
+            let x = x.as_array().unwrap();
+            let key = x[0].as_array().unwrap().iter().map(|x| x.as_u64().unwrap() as u8).collect::<Vec<_>>();
+            let value = x[1].as_f64().unwrap();
+            map.insert(key, value);
+        }
+    }
+
+    match alphabeta::alphabeta_poll(game, depth, map) {
+        Ok((_next_state, action)) => {
+            write_json_buffer(&json!({
+                "from": action.from,
+                "to": action.to,
+                "path": action.path
+            }));
+            let _ = Box::from_raw(sess);
+            std::ptr::null_mut()
+        },
+        Err(keys) => {
+            write_json_buffer(&json!(keys));
+            sess
+        }
+    }
+}
+
 
 #[no_mangle]
 pub unsafe extern fn greedy(game: *mut game::Game, temp: f64) {
