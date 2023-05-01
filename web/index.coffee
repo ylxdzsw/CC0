@@ -20,14 +20,12 @@ window.player_menu = do ->
         @items = @items.filter (x) -> x.id isnt id
         @update document.querySelector('#board-type').value ? 'standard'
 
-
     update: (board_type) ->
         for i in [1..2]
             el = document.querySelector "#player-#{i}"
             for item in @items
                 if item.supported_boards is null or item.supported_boards.includes board_type
                     if el.querySelector("option[value=\"i#{item.id}\"]") is null
-                        console.log item
                         option = document.createElement 'option'
                         option.value = "i#{item.id}"
                         option.textContent = item.name

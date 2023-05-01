@@ -31,12 +31,12 @@ do ->
                 if not onnx?
                     @disabled = true
                     document.querySelector '#download-model-status'
-                        .classList.remove 'hidden'
+                        .textContent = 'Downloading...'
                     onnx =
                         small: await ort.InferenceSession.create 'small.onnx'
                         # standard: await ort.InferenceSession.create 'standard.onnx'
                     document.querySelector '#download-model-status'
-                        .innerHTML = 'Model loaded'
+                        .textContent = 'Model loaded'
                     do resolve
 
     window.model = {
