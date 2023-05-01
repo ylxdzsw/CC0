@@ -1,7 +1,7 @@
 window.player_menu = do ->
     class PlayerMenuItem
         @next_id: 0
-        constructor: (@name, @agent) ->
+        constructor: (@name, @supported_boards, @agent) ->
             @id = PlayerMenuItem.next_id++
 
     items: []
@@ -10,26 +10,35 @@ window.player_menu = do ->
         item = @items.find (x) => x.id is id
         new item.agent
 
-    add: (name, agent) ->
-        item = new PlayerMenuItem name, agent
+    add: (name, supported_boards, agent) ->
+        item = new PlayerMenuItem name, supported_boards, agent
         @items.push item
-        for i in [1..2]
-            el = document.querySelector "#player-#{i}"
-            option = document.createElement 'option'
-            option.setAttribute 'value', "i#{item.id}"
-            option.textContent = name
-            el.appendChild option
-            el.value = "i#{item.id}" if not el.value
+
+        @update document.querySelector('#board-type').value ? 'standard'
 
     remove: (id) ->
         @items = @items.filter (x) -> x.id isnt id
+        @update document.querySelector('#board-type').value ? 'standard'
+
+
+    update: (board_type) ->
         for i in [1..2]
             el = document.querySelector "#player-#{i}"
-            el.value = "i#{@items[0].id}" if el.value is "i#{id}"
-        document.querySelectorAll "option[value=\"i#{id}\"]"
-            .remove()
+            for item in @items
+                if item.supported_boards is null or item.supported_boards.includes board_type
+                    if el.querySelector("option[value=\"i#{item.id}\"]") is null
+                        console.log item
+                        option = document.createElement 'option'
+                        option.value = "i#{item.id}"
+                        option.textContent = item.name
+                        el.appendChild option
+                        el.value = "i#{item.id}" if not el.value
+                if item.supported_boards isnt null and not item.supported_boards.includes board_type
+                        el.value = "i#{@items[0].id}" if el.value is "i#{item.id}"
+                        el.querySelector("option[value=\"i#{item.id}\"]")?.remove()
 
-player_menu.add "Human", class
+
+player_menu.add "Human", null, class
     move: -> new Promise (resolve, reject) =>
         canvas.install_handler
             click: (pos) =>
@@ -61,6 +70,10 @@ player_menu.add "Human", class
 
 window.app =
     init: ->
+        document.querySelector '#board-type'
+            .addEventListener 'change', (e) =>
+                player_menu.update e.target.value
+
         document.querySelector '#temperature-slider'
             .addEventListener 'change', =>
                 document.querySelector('#temperature-slider-label-num').textContent = do @get_temperature

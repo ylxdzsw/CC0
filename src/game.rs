@@ -188,10 +188,11 @@ impl Game {
         result
     }
 
-    pub fn from_key(proto: &Game, key: &[u8]) {
+    pub fn from_key(proto: &Game, key: &[u8]) -> Game {
         let mut game = Game::new(&proto.board);
         game.turn = key[0] as _;
         game.pieces = key[1..].to_vec();
+        game
     }
 }
 

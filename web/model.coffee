@@ -17,10 +17,10 @@ do ->
             if key[0] % 2 == 0
                 x[0] = 1
 
-            for piece in key[1..game.board_size+1]
+            for piece in key[1...game.board_size+1]
                 x[1 + piece] = 1
 
-            for piece in key[game.board_size+1..]
+            for piece in key[game.board_size+1...]
                 x[1 + game.board_size + piece] = 1
 
         x
@@ -32,15 +32,18 @@ do ->
                     @disabled = true
                     document.querySelector '#download-model-status'
                         .classList.remove 'hidden'
-                    onnx = await ort.InferenceSession.create 'model.onnx'
+                    onnx =
+                        small: await ort.InferenceSession.create 'small.onnx'
+                        # standard: await ort.InferenceSession.create 'standard.onnx'
                     document.querySelector '#download-model-status'
                         .innerHTML = 'Model loaded'
                     do resolve
 
     window.model = {
+        supports: (game) -> onnx[game.board_type]?
         score: (game, key = null) ->
             input = new ort.Tensor 'float32', encode_input(game, key), [1, 1 + 2 * game.board_size]
-            output = await onnx.run encoded_state: input
+            output = await onnx[game.board_type].run encoded_state: input
             prediction = output.value.data[0]
             if prediction < 0
                 0
@@ -50,7 +53,7 @@ do ->
                 prediction
     }
 
-    player_menu.add "Alphabeta + Model", class
+    player_menu.add "Alphabeta + Model", ['small', 'standard'], class
         move: ->
             await sleep 0
 
@@ -60,13 +63,13 @@ do ->
             while sess != 0
                 keys = do read_wasm_json
                 write_wasm_json ([key, await window.model.score app.game, key] for key in keys)
-                sess = cc0.greedy_poll app.game.ptr, app.get_alphabeta_depth(), sess
+                sess = cc0.alphabeta_poll app.game.ptr, app.get_alphabeta_depth(), sess
                 await sleep 0
 
             action = do read_wasm_json
             [action.from, action.to]
 
-    player_menu.add "Greedy + Model", class
+    player_menu.add "Greedy + Model", ['small', 'standard'], class
         move: ->
             await sleep 0
 
@@ -82,3 +85,18 @@ do ->
             action = do read_wasm_json
             [action.from, action.to]
 
+    player_menu.add "MCTS + Model", ['small', 'standard'], class
+        move: ->
+            await sleep 0
+
+            sess = cc0.mcts_poll app.game.ptr, app.get_mcts_iter(), 0
+            await sleep 0
+
+            while sess != 0
+                keys = do read_wasm_json
+                write_wasm_json ([key, await window.model.score app.game, key] for key in keys)
+                sess = cc0.mcts_poll app.game.ptr, app.get_mcts_iter(), sess
+                await sleep 0
+
+            action = do read_wasm_json
+            [action.from, action.to]

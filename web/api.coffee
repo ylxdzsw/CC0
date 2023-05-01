@@ -25,8 +25,8 @@ do ->
         buffer[1] = encoded.length
 
     window.Game = class
-        constructor: (board_type) ->
-            switch board_type
+        constructor: (@board_type) ->
+            switch @board_type
                 when "tiny"
                     @ptr = do cc0.new_tiny_game
                 when "small"
@@ -94,14 +94,14 @@ do ->
                     when 2 then "Player 2 won"
                     when 3 then "Tie"
 
-            if window.model
+            if window.model?.supports @
                 score = await window.model.score @
                 app.update_status_bar "Model Estimation": (100 * score).toFixed 2
 
         free: ->
             cc0.free_game @ptr
 
-    player_menu.add "Alphabeta + Heuristic", class
+    player_menu.add "Alphabeta + Heuristic", null, class
         move: ->
             await sleep 0
             cc0.alphabeta app.game.ptr, do app.get_alphabeta_depth
@@ -109,10 +109,18 @@ do ->
             action = do read_wasm_json
             [action.from, action.to]
 
-    player_menu.add "Greedy + Heuristic", class
+    player_menu.add "Greedy + Heuristic", null, class
         move: ->
             await sleep 0
             cc0.greedy app.game.ptr, do app.get_temperature
+            await sleep 0
+            action = do read_wasm_json
+            [action.from, action.to]
+
+    player_menu.add "MCTS + Heuristic", null, class
+        move: ->
+            await sleep 0
+            cc0.mcts app.game.ptr, do app.get_mcts_iter
             await sleep 0
             action = do read_wasm_json
             [action.from, action.to]

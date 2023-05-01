@@ -56,7 +56,7 @@ pub mod board;
 pub mod game;
 pub mod alphabeta;
 pub mod greedy;
-// pub mod mcts;
+pub mod mcts;
 
 
 #[no_mangle]
@@ -218,16 +218,17 @@ pub unsafe extern fn game_turn(game: *mut game::Game) -> usize {
 #[no_mangle]
 pub unsafe extern fn game_expand(game: *mut game::Game) {
     let game = &*game;
+    let baseline = 2. * game.board.n_pieces as f64;
     let (next_states, actions) = game.expand(true);
     let (pieces, (values, (actions, terminals))): (Vec<_>, (Vec<_>, (Vec <_>, Vec<_>))) = next_states.into_iter().zip(actions.into_iter())
         .map(|(next_state, action)| {
             let heuristic = next_state.heuristic();
-            let value = if heuristic >= 10. {
+            let value = if heuristic >= baseline {
                 1.0
-            } else if heuristic <= -10. {
+            } else if heuristic <= -baseline {
                 0.0
             } else {
-                0.5 + heuristic / 20.
+                0.5 + heuristic / (2. * baseline)
             };
             let is_terminal = next_state.expand(false).0.is_empty();
             (next_state.pieces, (value, ([action.from, action.to], is_terminal)))
@@ -284,7 +285,6 @@ pub unsafe extern fn alphabeta_poll(game: *mut game::Game, depth: usize, mut ses
     }
 }
 
-
 #[no_mangle]
 pub unsafe extern fn greedy(game: *mut game::Game, temp: f64) {
     let game = &*game;
@@ -317,6 +317,54 @@ pub unsafe extern fn greedy_poll(game: *mut game::Game, temp: f64, mut sess: *mu
     }
 
     match greedy::greedy_poll(game, temp, map) {
+        Ok((_next_state, action)) => {
+            write_json_buffer(&json!({
+                "from": action.from,
+                "to": action.to,
+                "path": action.path
+            }));
+            let _ = Box::from_raw(sess);
+            std::ptr::null_mut()
+        },
+        Err(keys) => {
+            write_json_buffer(&json!(keys));
+            sess
+        }
+    }
+}
+
+#[no_mangle]
+pub unsafe extern fn mcts(game: *mut game::Game, iterations: usize) {
+    let game = &*game;
+    let (_next_state, action) = mcts::mcts(game, iterations);
+    write_json_buffer(&json!({
+        "from": action.from,
+        "to": action.to,
+        "path": action.path
+    }));
+}
+
+#[no_mangle]
+pub unsafe extern fn mcts_poll(game: *mut game::Game, iterations: usize, mut sess: *mut (mcts::Node, BTreeMap<Vec<u8>, f64>)) -> *mut (mcts::Node, BTreeMap<Vec<u8>, f64>) {
+    let game = &*game;
+    let first_call = sess.is_null();
+
+    if first_call {
+        sess = Box::leak(Box::new(mcts::new_session(game.clone())));
+    }
+    let (root, map) = &mut *sess;
+
+    if !first_call {
+        let data = read_json_buffer().unwrap();
+        for x in data.as_array().unwrap().iter() {
+            let x = x.as_array().unwrap();
+            let key = x[0].as_array().unwrap().iter().map(|x| x.as_u64().unwrap() as u8).collect::<Vec<_>>();
+            let value = x[1].as_f64().unwrap();
+            map.insert(key, value);
+        }
+    }
+
+    match mcts::mcts_poll(game, iterations, (root, map)) {
         Ok((_next_state, action)) => {
             write_json_buffer(&json!({
                 "from": action.from,
