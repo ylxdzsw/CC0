@@ -118,6 +118,7 @@ window.app =
 
         canvas.init board_type
         do canvas.reset
+        @update_status_bar reset: true
 
         player1 = player_menu.new parseInt document.querySelector("#player-1").value.slice(1)
         player2 = player_menu.new parseInt document.querySelector("#player-2").value.slice(1)
