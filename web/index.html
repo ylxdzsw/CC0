@@ -1,0 +1,52 @@
+<div id="top-pannel">
+    <div id="self-id"></div>
+    <div id="board-selection">
+        <label for="board-type">Board Type: </label>
+        <select id="board-type">
+            <option value="tiny">Tiny</option>
+            <option value="tiny+">Tiny+</option>
+            <option value="small">Small</option>
+            <option value="small+">Small+</option>
+            <option value="standard" selected>Standard</option>
+            <option value="standard+">Standard+</option>
+            <option value="large">Large</option>
+            <option value="large+">Large+</option>
+            <option value="huge">Huge</option>
+            <option value="huge+">Huge+</option>
+        </select>
+    </div>
+
+    <div id="player-menu">
+        <label for="player-1">Player 1: </label>
+        <select id="player-1"></select>
+        <label for="player-2">Player 2: </label>
+        <select id="player-2"></select>
+    </div>
+
+    <div>
+        <input type="range" id="temperature-slider" min="0.001" max="3.163" value="0.316" step="0.001">
+        <label for="temperature-slider">Softmax Temperature = <span id="temperature-slider-label-num">0.1</span></label>
+    </div>
+
+    <div>
+        <input type="range" id="mctc-iter-slider" min="10" max="200" value="20">
+        <label for="mctc-iter-slider">MCTS Iterations = <span id="mctc-iter-slider-label-num">400</span></label>
+    </div>
+
+    <div>
+        <input type="range" id="alphabeta-depth-slider" min="2" max="6" value="2">
+        <label for="alphabeta-depth-slider">Alphabeta Search Depth = <span id="alphabeta-depth-slider-label-num">2</span></label>
+    </div>
+
+    <div>
+    <button id="download-model-button">Download Model</button>
+    <span id="download-model-status" class="hidden">Downloading</span>
+    </div>
+
+    <button id="new-game-button">New Game</button>
+</div>
+
+<div id="canvas"></div>
+<p id="status-bar"></p>
+
+<div id="log"></div>
