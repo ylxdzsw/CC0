@@ -46,14 +46,7 @@ impl Game {
     }
 
     pub fn has_piece(&self, piece: Position) -> bool {
-        // !!! binary search has mysteriously failed in wasm !!!
-        // self.pieces.binary_search(&piece).is_ok()
-        for &p in &self.pieces {
-            if p == piece {
-                return true
-            }
-        }
-        false
+        self.pieces.contains(&piece) // or two binary searches?
     }
 
     pub fn move_to(&self, from: Position, to: Position) -> Self {
