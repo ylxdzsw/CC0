@@ -94,6 +94,11 @@ unsafe extern fn set_random_seed(seed: u32) {
 }
 
 #[no_mangle]
+pub unsafe extern fn new_tiny_game() -> *mut game::Game {
+    Box::leak(Box::new(game::Game::new(&board::TINY_BOARD)))
+}
+
+#[no_mangle]
 pub unsafe extern fn new_small_game() -> *mut game::Game {
     Box::leak(Box::new(game::Game::new(&board::SMALL_BOARD)))
 }
@@ -101,6 +106,41 @@ pub unsafe extern fn new_small_game() -> *mut game::Game {
 #[no_mangle]
 pub unsafe extern fn new_standard_game() -> *mut game::Game {
     Box::leak(Box::new(game::Game::new(&board::STANDARD_BOARD)))
+}
+
+#[no_mangle]
+pub unsafe extern fn new_large_game() -> *mut game::Game {
+    Box::leak(Box::new(game::Game::new(&board::LARGE_BOARD)))
+}
+
+#[no_mangle]
+pub unsafe extern fn new_huge_game() -> *mut game::Game {
+    Box::leak(Box::new(game::Game::new(&board::HUGE_BOARD)))
+}
+
+#[no_mangle]
+pub unsafe extern fn new_tiny_plus_game() -> *mut game::Game {
+    Box::leak(Box::new(game::Game::new(&board::TINY_PLUS_BOARD)))
+}
+
+#[no_mangle]
+pub unsafe extern fn new_small_plus_game() -> *mut game::Game {
+    Box::leak(Box::new(game::Game::new(&board::SMALL_PLUS_BOARD)))
+}
+
+#[no_mangle]
+pub unsafe extern fn new_standard_plus_game() -> *mut game::Game {
+    Box::leak(Box::new(game::Game::new(&board::STANDARD_PLUS_BOARD)))
+}
+
+#[no_mangle]
+pub unsafe extern fn new_large_plus_game() -> *mut game::Game {
+    Box::leak(Box::new(game::Game::new(&board::LARGE_PLUS_BOARD)))
+}
+
+#[no_mangle]
+pub unsafe extern fn new_huge_plus_game() -> *mut game::Game {
+    Box::leak(Box::new(game::Game::new(&board::HUGE_PLUS_BOARD)))
 }
 
 #[no_mangle]

@@ -15,6 +15,11 @@ window.canvas =
             when 'standard' then @board = StandardBoard
             when 'large' then @board = LargeBoard
             when 'huge' then @board = HugeBoard
+            when 'tiny+' then @board = TinyPlusBoard
+            when 'small+' then @board = SmallPlusBoard
+            when 'standard+' then @board = StandardPlusBoard
+            when 'large+' then @board = LargePlusBoard
+            when 'huge+' then @board = HugePlusBoard
             else return console.error 'unknown board'
 
         document.querySelector('#canvas').innerHTML = ''

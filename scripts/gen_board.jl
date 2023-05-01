@@ -94,9 +94,9 @@ function write_adj_matrix(mat)
     buf = IOBuffer()
     buf << '['
     for i in 1:size(mat)[1]
-        buf << "[$(join(mat[i, :], ','))],\n"
+        buf << "[$(join(mat[i, :], ','))],"
     end
-    skip(buf, -2)
+    skip(buf, -1)
     buf << ']'
     take!(buf) |> String
 end
@@ -107,8 +107,34 @@ function gen_base_ids(nodes, rank)
     self_base_ids, oppo_base_ids
 end
 
-@main function rust(rank::Int)
+function gen_base_ids_plus(base_ids, adj_matrix)
+    reachables = Set{Int}()
+    for id in base_ids
+        reachables = reachables ∪ Set(adj_matrix[id+1, :])
+    end
+    delete!(reachables, 255)
+    reachables |> collect |> sort
+end
 
+@main function rust(rank::Int)
+    nodes = gen_nodes(rank)
+    label!(nodes)
+    println(length(nodes))
+    self_base_ids, oppo_base_ids = gen_base_ids(nodes, rank)
+    println(length(self_base_ids))
+    println(self_base_ids)
+    println(oppo_base_ids)
+    adj_matrix = gen_adj_matrix(nodes)
+    println(write_adj_matrix(adj_matrix))
+    println(score(nodes, adj_matrix, oppo_base_ids[end]))
+    println(score(nodes, adj_matrix, self_base_ids[1]))
+    x = score(nodes, adj_matrix, self_base_ids[1])
+    println(sum(x[i+1] for i in self_base_ids))
+
+    println(gen_base_ids_plus(self_base_ids, adj_matrix))
+    println(gen_base_ids_plus(oppo_base_ids, adj_matrix))
+    println(length(gen_base_ids_plus(self_base_ids, adj_matrix)))
+    println(sum(x[i+1] for i in gen_base_ids_plus(self_base_ids, adj_matrix)))
 end
 
 # recenter in (100, 100) and make y axis from top to down

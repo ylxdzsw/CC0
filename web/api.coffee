@@ -27,10 +27,26 @@ do ->
     window.Game = class
         constructor: (board_type) ->
             switch board_type
-                when "standard"
-                    @ptr = do cc0.new_standard_game
+                when "tiny"
+                    @ptr = do cc0.new_tiny_game
                 when "small"
                     @ptr = do cc0.new_small_game
+                when "standard"
+                    @ptr = do cc0.new_standard_game
+                when "large"
+                    @ptr = do cc0.new_large_game
+                when "huge"
+                    @ptr = do cc0.new_huge_game
+                when "tiny+"
+                    @ptr = do cc0.new_tiny_plus_game
+                when "small+"
+                    @ptr = do cc0.new_small_plus_game
+                when "standard+"
+                    @ptr = do cc0.new_standard_plus_game
+                when "large+"
+                    @ptr = do cc0.new_large_plus_game
+                when "huge+"
+                    @ptr = do cc0.new_huge_plus_game
                 else
                     throw 0
 
