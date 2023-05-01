@@ -1,5 +1,3 @@
-# XGBoost performs MUCH BETTER than any other model I tried. Unfortunately, it does not support wasm.
-
 import sys
 import numpy as np
 from xgboost import XGBRegressor

@@ -27,7 +27,6 @@ torch.onnx.export(
     output_names=["value"]
 )
 
-import onnx
 from onnxruntime.quantization import quantize_dynamic
 
 # about 5% accuracy loss!

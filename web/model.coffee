@@ -53,7 +53,7 @@ do ->
                 prediction
     }
 
-    player_menu.add "Alphabeta + Model", ['small', 'standard'], class
+    player_menu.add "Alphabeta + Model", ['small'], class
         move: ->
             await sleep 0
 
@@ -69,7 +69,7 @@ do ->
             action = do read_wasm_json
             [action.from, action.to]
 
-    player_menu.add "Greedy + Model", ['small', 'standard'], class
+    player_menu.add "Greedy + Model", ['small'], class
         move: ->
             await sleep 0
 
@@ -85,7 +85,7 @@ do ->
             action = do read_wasm_json
             [action.from, action.to]
 
-    player_menu.add "MCTS + Model", ['small', 'standard'], class
+    player_menu.add "MCTS + Model", ['small'], class
         move: ->
             await sleep 0
 
