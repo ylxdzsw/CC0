@@ -55,6 +55,12 @@ libcc0.game_turn.restype = ctypes.c_size_t
 libcc0.game_expand.argtypes = [ctypes.c_void_p]
 libcc0.game_expand.restype = None
 
+libcc0.game_key.argtypes = [ctypes.c_void_p]
+libcc0.game_key.restype = None
+
+libcc0.game_load_key.argtypes = [ctypes.c_void_p]
+libcc0.game_load_key.restype = None
+
 libcc0.alphabeta.argtypes = [ctypes.c_void_p, ctypes.c_size_t]
 libcc0.alphabeta.restype = None
 
@@ -121,6 +127,14 @@ class Game:
     def expand(self):
         libcc0.game_expand(self.ptr)
         return read_wasm_json()
+
+    def key(self):
+        libcc0.game_key(self.ptr)
+        return read_wasm_json()
+
+    def load_key(self, key):
+        write_wasm_json(key)
+        libcc0.game_load_key(self.ptr)
 
     def __del__(self):
         libcc0.free_game(self.ptr)

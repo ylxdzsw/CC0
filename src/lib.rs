@@ -214,27 +214,25 @@ pub unsafe extern fn game_turn(game: *mut game::Game) -> usize {
     game.turn
 }
 
-// special method for training the model. Returns a list of chlidren pieces (omit turn info) and a list of their heuristic values
 #[no_mangle]
 pub unsafe extern fn game_expand(game: *mut game::Game) {
     let game = &*game;
-    let baseline = 2. * game.board.n_pieces as f64;
-    let (next_states, actions) = game.expand(true);
-    let (pieces, (values, (actions, terminals))): (Vec<_>, (Vec<_>, (Vec <_>, Vec<_>))) = next_states.into_iter().zip(actions.into_iter())
-        .map(|(next_state, action)| {
-            let heuristic = next_state.heuristic();
-            let value = if heuristic >= baseline {
-                1.0
-            } else if heuristic <= -baseline {
-                0.0
-            } else {
-                0.5 + heuristic / (2. * baseline)
-            };
-            let is_terminal = next_state.expand(false).0.is_empty();
-            (next_state.pieces, (value, ([action.from, action.to], is_terminal)))
-        })
-        .unzip();
-    write_json_buffer(&json!([pieces, values, actions, terminals]));
+    let (next_states, _) = game.expand(false);
+    let next_state_keys = next_states.into_iter().map(|next_state| next_state.key()).collect::<Vec<_>>();
+    write_json_buffer(&json!(next_state_keys));
+}
+
+#[no_mangle]
+pub unsafe extern fn game_key(game: *mut game::Game) {
+    let game = &mut *game;
+    write_json_buffer(&json!(game.key()));
+}
+
+#[no_mangle]
+pub unsafe extern fn game_load_key(game: *mut game::Game) {
+    let game = &mut *game;
+    let key = read_json_buffer().unwrap();
+    *game = game::Game::from_key(game, &key.as_array().unwrap().iter().map(|x| x.as_u64().unwrap() as u8).collect::<Vec<_>>());
 }
 
 #[no_mangle]
@@ -379,4 +377,18 @@ pub unsafe extern fn mcts_poll(game: *mut game::Game, iterations: usize, mut ses
             sess
         }
     }
+}
+
+// a pure math function which is somehow tedieous to implement in js
+#[no_mangle]
+pub unsafe extern fn softmax_expectation(temp: f64, invert: bool) -> f64 {
+    let data = read_json_buffer().unwrap();
+    let data = data.as_array().unwrap();
+    let data = data.iter().map(|x| x.as_f64().unwrap()).collect::<Vec<_>>();
+    let mut prob = data.clone();
+    if invert {
+        prob.iter_mut().for_each(|x| *x = 1.0 - *x);
+    }
+    softmax(&mut prob, temp);
+    data.iter().zip(prob.iter()).map(|(x, y)| x * y).sum::<f64>()
 }
