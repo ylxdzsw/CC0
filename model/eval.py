@@ -18,8 +18,8 @@ if len(sys.argv) > 2:
 else:
     data = load('data_{:03}'.format(r))[:256]
 
-for encoded_state, y in data:
+for encoded_state, y, w in data:
     x = np.array(encoded_state)
     x = np.expand_dims(x, 0)
     p = model(torch.tensor(x, dtype=torch.float))
-    print(p.item(), y)
+    print(torch.sigmoid(p).item(), y)

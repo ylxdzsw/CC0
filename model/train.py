@@ -1,49 +1,63 @@
 import torch
 import numpy as np
 from multiprocessing import Pool
-from api import Game, set_random_seed
+from api import Game, set_random_seed, greedy, alphabeta
 from utils import save, load
 from model import Model
 
 # otherwise it reports a problem that I don't bother to solve
 torch.multiprocessing.set_sharing_strategy('file_system')
 
-def gen_data(board_type):
+def gen_data(board_type, p1_type, p2_type):
     global target_model
     game = Game(board_type)
 
-    data = [] # (encoded_inputs, state_value)
+    data = [] # (encoded_inputs, final_result, weight)
 
-    while game.get_status() == 0:
+    def _gen_data():
+        key = game.key() # game will change afterwards
+
         if game.turn() >= 10 * game.n_pieces: # force end overly long games
-            return []
+            return -1, -1
 
-        child_pieces, child_values, actions, terminals = game.expand()
+        match game.get_status():
+            case 0:
+                player_type = p1_type if game.is_p1_moving_next() else p2_type
 
-        if target_model != None:
-            for i, pieces in enumerate(child_pieces):
-                if terminals[i]:
-                    continue # use the true reward
-                encoded = torch.tensor(Model.encode_child(game, pieces), dtype=torch.float)
-                child_values[i] = target_model(torch.unsqueeze(encoded, 0)).item()
+                match player_type:
+                    case "greedy":
+                        action = greedy(game, 0.1)
+                        game.move_to(*action)
+                    case "alphabeta":
+                        action = alphabeta(game, 3)
+                        game.move_to(*action)
+                    case "model":
+                        child_keys = game.expand()
+                        batched_input = [ Model.encode_input(game, key) for key in child_keys ]
+                        batched_input = torch.tensor(batched_input, dtype=torch.float)
+                        probs = torch.sigmoid(model(batched_input))
+                        if game.is_p2_moving_next():
+                            probs = 1 - probs
+                        probs = torch.softmax(probs / 0.1, 0)
+                        i = torch.multinomial(probs, 1).item()
+                        game.load_key(child_keys[i])
 
-        probs = torch.tensor(child_values, dtype=torch.float)
-        if game.is_p2_moving_next():
-            probs = 1 - probs
-        probs = torch.softmax(probs / 0.02, 0)
+                p1win, ending_turn = _gen_data()
 
-        if game.turn() >= game.n_pieces: # skip first several moves
-            updated_value = (torch.tensor(child_values, dtype=torch.float) * probs).sum().item()
-            if 0.48 < updated_value < 0.52:
-                pass # skip near-draw games
-            else:
-                data.append((Model.encode_game(game), updated_value))
+            case 1: # p1 win
+                p1win, ending_turn = 1, key[0]
 
-        if np.random.rand() < 0.1:
-            i = np.random.randint(len(actions))
-        else:
-            i = torch.multinomial(probs, 1).item()
-        game.move_to(*actions[i])
+            case 2: # p2 win
+                p1win, ending_turn = 0, key[0]
+
+        if p1win != -1: # properly ended
+            encoded_input = Model.encode_input(game, key)
+            weight = 0.8 ** (ending_turn - key[0])
+            data.append((encoded_input, p1win, weight))
+
+        return p1win, ending_turn
+
+    _gen_data()
 
     return data
 
@@ -58,15 +72,15 @@ def worker_init(model_path):
         torch.set_num_threads(1)
         target_model = torch.jit.load(model_path).eval()
 
-def collect_data(target_model, n, board_type="standard"):
+def collect_data(target_model, spec):
     if target_model != None:
         target_model.cpu().save('scripted_model.pt')
         with Pool(128, initializer=worker_init, initargs=('scripted_model.pt',)) as pool:
-            data_batches = pool.map(gen_data, (board_type for _ in range(n)), chunksize=1)
+            data_batches = pool.starmap(gen_data, spec, chunksize=4)
         target_model.cuda()
     else:
         with Pool(128, initializer=worker_init, initargs=(None,)) as pool:
-            data_batches = pool.map(gen_data, (board_type for _ in range(n)), chunksize=1)
+            data_batches = pool.starmap(gen_data, spec, chunksize=4)
 
     return [ x for batch in data_batches for x in batch ]
 
@@ -83,21 +97,22 @@ def train(model, optimizer, data):
         def __getitem__(self, index):
             x = np.array(self.data[index][0], dtype=np.float32)
             y = np.array(self.data[index][1], dtype=np.float32)
-            return x, y
+            w = np.array(self.data[index][2], dtype=np.float32)
+            return x, y, w
 
-    dataloader = torch.utils.data.DataLoader(Dataset(data), batch_size=256, shuffle=True)
+    dataloader = torch.utils.data.DataLoader(Dataset(data), batch_size=1024, shuffle=True)
     i, total_loss = 0, 0
-    for encoded_states, values in dataloader:
+    for encoded_states, values, weights in dataloader:
         predicted_values = model(encoded_states.cuda())
-        loss = torch.nn.functional.mse_loss(predicted_values, values.cuda())
+        loss = torch.nn.functional.binary_cross_entropy_with_logits(predicted_values, values.cuda(), weight = weights.cuda())
+        total_loss += loss.item() / 100
         optimizer.zero_grad() # important! default is accumulation
         loss.backward()
         # torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         optimizer.step()
 
-        total_loss += loss.item() / 1000
         i += 1
-        if i % 1000 == 0:
+        if i % 100 == 0:
             print(total_loss, flush=True)
             total_loss = 0
 
@@ -113,12 +128,13 @@ if __name__ == '__main__':
 
     dummy_game = Game(board_type)
     model = torch.jit.script(Model(dummy_game.board_size).cuda())
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-5)
+    # optimizer = torch.optim.AdamW(model.parameters(), lr=5e-6, weight_decay=1e-2)
+    optimizer = torch.optim.SGD(model.parameters(), lr=1e-5, weight_decay=1e-2)
     r = -1
 
     try:
         model.load_state_dict(checkpoint['model_state_dict'])
-        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        # optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         r = checkpoint['r']
     except:
         pass
@@ -130,19 +146,30 @@ if __name__ == '__main__':
             data = load("data_{:03}".format(r))
         except:
             print("collecting data")
-            if r == 0:
-                data = collect_data(None, 200000, board_type)
-            else:
-                data = collect_data(model, 50000, board_type)
+            data = collect_data(None, (
+                [(board_type, "greedy", "greedy")] * 10000 +
+                [(board_type, "greedy", "alphabeta")] * 10000 +
+                [(board_type, "alphabeta", "greedy")] * 10000 +
+                [(board_type, "alphabeta", "alphabeta")] * 10000
+            ))
+            if r > 5:
+                data += collect_data(model, (
+                    [(board_type, "model", "greedy")] * 10000 +
+                    [(board_type, "greedy", "model")] * 10000 +
+                    [(board_type, "model", "alphabeta")] * 10000 +
+                    [(board_type, "alphabeta", "model")] * 10000 +
+                    [(board_type, "model", "model")] * 20000
+                ))
+            print(f"{len(data)} training data collected")
             save(data, "data_{:03}".format(r))
 
-        print(f"load last 5 rounds data")
-        for i in range(r-5, r):
+        if r > 5:
+            print(f"load a random round history data")
             try:
+                i = np.random.randint(0, r - 1)
                 data.extend(load("data_{:03}".format(i)))
             except:
-                print("skip data_{:03}".format(i))
-                pass
+                print("reading data_{:03} failed".format(i))
 
         print("training model")
         train(model, optimizer, data)

@@ -24,6 +24,11 @@ do ->
         new Uint8Array(cc0.memory.buffer, buffer[0], encoded.length).set(encoded)
         buffer[1] = encoded.length
 
+    window.softmax_expectation = (x, temp = 0.2, invert = false) ->
+        console.log x
+        write_wasm_json x
+        cc0.softmax_expectation temp, invert
+
     window.Game = class
         constructor: (@board_type) ->
             switch @board_type
@@ -84,6 +89,10 @@ do ->
         turn: ->
             cc0.game_turn @ptr
 
+        expand: ->
+            cc0.game_expand @ptr
+            do read_wasm_json
+
         update_status_bar: ->
             app.update_status_bar "Turn": @turn()
             if @get_status() == 0
@@ -95,8 +104,11 @@ do ->
                     when 3 then "Tie"
 
             if window.model?.supports @
-                score = await window.model.score @
-                app.update_status_bar "Model Estimation": (100 * score).toFixed 2
+                if @get_status() == 0
+                    score = await window.model.score_expectation @
+                    app.update_status_bar "Model Estimation": (100 * score).toFixed 2
+                else
+                    app.update_status_bar "Model Estimation": null
 
         free: ->
             cc0.free_game @ptr

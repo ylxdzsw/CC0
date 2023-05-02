@@ -39,19 +39,18 @@ do ->
                         .textContent = 'Model loaded'
                     do resolve
 
-    window.model = {
+    window.model =
         supports: (game) -> onnx[game.board_type]?
         score: (game, key = null) ->
             input = new ort.Tensor 'float32', encode_input(game, key), [1, 1 + 2 * game.board_size]
             output = await onnx[game.board_type].run encoded_state: input
             prediction = output.value.data[0]
-            if prediction < 0
-                0
-            else if prediction > 1
-                1
-            else
-                prediction
-    }
+            1 / (1 + Math.exp -prediction)
+        score_expectation: (game) ->
+            keys = game.expand()
+            scores = for key in keys
+                await window.model.score game, key
+            softmax_expectation scores, 0.2, game.is_p2_moving_next()
 
     player_menu.add "Alphabeta + Model", ['small'], class
         move: ->
