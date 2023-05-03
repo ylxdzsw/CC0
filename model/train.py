@@ -165,15 +165,18 @@ if __name__ == '__main__':
 
         if r > 5:
             print(f"load a random round history data")
-            try:
-                i = np.random.randint(0, r - 1)
-                data.extend(load("data_{:03}".format(i)))
-            except:
-                print("reading data_{:03} failed".format(i))
+            for _ in range(100):
+                try:
+                    i = np.random.randint(0, r - 1)
+                    data.extend(load("data_{:03}".format(i)))
+                    print("data_{:03} loaded".format(i))
+                    break
+                except:
+                    print("reading data_{:03} failed".format(i))
 
         print("training model")
         train(model, optimizer, data)
         save({ 'r': r, 'board_type': board_type, 'model_state_dict': model.state_dict(), 'optimizer_state_dict': optimizer.state_dict() }, "model_{:03}".format(r))
 
-        if r > 30:
+        if r >= 50:
             break

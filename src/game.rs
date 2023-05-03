@@ -3,11 +3,7 @@ use std::vec::Vec;
 use crate::{INVALID_POSITION, Position, board::Board};
 
 #[derive(Clone)]
-pub struct Action {
-    pub from: Position,
-    pub to: Position,
-    pub path: Vec<Position>
-}
+pub struct Action(pub Position, pub Position); // from, to
 
 #[derive(Clone)]
 pub struct Game {
@@ -95,7 +91,7 @@ impl Game {
             for dest in paths.iter().enumerate().filter(|&(dest, from)| *from != INVALID_POSITION && dest as u8 != piece).map(|(dest, _)| dest as Position) {
                 next_states.push(self.move_to(piece, dest));
                 if record_actions {
-                    actions.push(Action { from: piece, to: dest, path: paths.clone() });
+                    actions.push(Action(piece, dest));
                 }
             }
         }
@@ -105,6 +101,25 @@ impl Game {
         }
 
         (next_states, actions)
+    }
+
+    pub fn expand_forward_only(&self, record_actions: bool) -> (Vec<Game>, Vec<Action>) {
+        let (next_states, actions) = self.expand(record_actions);
+        let (forward_only_next_states, forward_only_actions): (Vec<Game>, Vec<Action>) = next_states.iter().zip(actions.iter())
+            .filter(|(next_state, _)| {
+                if self.is_p1_moving_next() {
+                    next_state.p1_distance() < self.p1_distance()
+                } else {
+                    next_state.p2_distance() < self.p2_distance()
+                }
+            })
+            .map(|(next_state, action)| (next_state.clone(), action.clone()))
+            .unzip();
+        if forward_only_next_states.is_empty() {
+            (next_states, actions)
+        } else {
+            (forward_only_next_states, forward_only_actions)
+        }
     }
 
     pub fn clone_with_pieces(&self, pieces: &[Position]) -> Self {

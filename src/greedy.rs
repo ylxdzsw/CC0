@@ -20,8 +20,12 @@ pub fn greedy(game: &Game, temp: f64) -> (Game, Action) {
     (next_states.swap_remove(i), actions.swap_remove(i))
 }
 
-pub fn greedy_poll(game: &Game, temp: f64, score_map: &BTreeMap<Vec<u8>, f64>) -> Result<(Game, Action), Vec<Vec<u8>>> {
-    let (mut next_states, mut actions) = game.expand(true);
+pub fn greedy_poll(game: &Game, temp: f64, forward_only: bool, score_map: &BTreeMap<Vec<u8>, f64>) -> Result<(Game, Action), Vec<Vec<u8>>> {
+    let (mut next_states, mut actions) = if forward_only {
+        game.expand_forward_only(true)
+    } else {
+        game.expand(true)
+    };
 
     if next_states.is_empty() {
         panic!("Game already ends!")

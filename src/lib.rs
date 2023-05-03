@@ -239,15 +239,11 @@ pub unsafe extern fn game_load_key(game: *mut game::Game) {
 pub unsafe extern fn alphabeta(game: *mut game::Game, depth: usize) {
     let game = &*game;
     let (_next_state, action) = alphabeta::alphabeta(game, depth);
-    write_json_buffer(&json!({
-        "from": action.from,
-        "to": action.to,
-        "path": action.path
-    }));
+    write_json_buffer(&json!([action.0, action.1]));
 }
 
 #[no_mangle]
-pub unsafe extern fn alphabeta_poll(game: *mut game::Game, depth: usize, mut sess: *mut BTreeMap<Vec<u8>, f64>) -> *mut BTreeMap<Vec<u8>, f64> {
+pub unsafe extern fn alphabeta_poll(game: *mut game::Game, depth: usize, forward_only: bool, mut sess: *mut BTreeMap<Vec<u8>, f64>) -> *mut BTreeMap<Vec<u8>, f64> {
     let game = &*game;
     let first_call = sess.is_null();
 
@@ -266,13 +262,9 @@ pub unsafe extern fn alphabeta_poll(game: *mut game::Game, depth: usize, mut ses
         }
     }
 
-    match alphabeta::alphabeta_poll(game, depth, map) {
+    match alphabeta::alphabeta_poll(game, depth, forward_only, map) {
         Ok((_next_state, action)) => {
-            write_json_buffer(&json!({
-                "from": action.from,
-                "to": action.to,
-                "path": action.path
-            }));
+            write_json_buffer(&json!([action.0, action.1]));
             let _ = Box::from_raw(sess);
             std::ptr::null_mut()
         },
@@ -287,15 +279,11 @@ pub unsafe extern fn alphabeta_poll(game: *mut game::Game, depth: usize, mut ses
 pub unsafe extern fn greedy(game: *mut game::Game, temp: f64) {
     let game = &*game;
     let (_next_state, action) = greedy::greedy(game, temp);
-    write_json_buffer(&json!({
-        "from": action.from,
-        "to": action.to,
-        "path": action.path
-    }));
+    write_json_buffer(&json!([action.0, action.1]));
 }
 
 #[no_mangle]
-pub unsafe extern fn greedy_poll(game: *mut game::Game, temp: f64, mut sess: *mut BTreeMap<Vec<u8>, f64>) -> *mut BTreeMap<Vec<u8>, f64> {
+pub unsafe extern fn greedy_poll(game: *mut game::Game, temp: f64, forward_only: bool, mut sess: *mut BTreeMap<Vec<u8>, f64>) -> *mut BTreeMap<Vec<u8>, f64> {
     let game = &*game;
     let first_call = sess.is_null();
 
@@ -314,13 +302,9 @@ pub unsafe extern fn greedy_poll(game: *mut game::Game, temp: f64, mut sess: *mu
         }
     }
 
-    match greedy::greedy_poll(game, temp, map) {
+    match greedy::greedy_poll(game, temp, forward_only, map) {
         Ok((_next_state, action)) => {
-            write_json_buffer(&json!({
-                "from": action.from,
-                "to": action.to,
-                "path": action.path
-            }));
+            write_json_buffer(&json!([action.0, action.1]));
             let _ = Box::from_raw(sess);
             std::ptr::null_mut()
         },
@@ -335,15 +319,11 @@ pub unsafe extern fn greedy_poll(game: *mut game::Game, temp: f64, mut sess: *mu
 pub unsafe extern fn mcts(game: *mut game::Game, iterations: usize) {
     let game = &*game;
     let (_next_state, action) = mcts::mcts(game, iterations);
-    write_json_buffer(&json!({
-        "from": action.from,
-        "to": action.to,
-        "path": action.path
-    }));
+    write_json_buffer(&json!([action.0, action.1]));
 }
 
 #[no_mangle]
-pub unsafe extern fn mcts_poll(game: *mut game::Game, iterations: usize, mut sess: *mut (mcts::Node, BTreeMap<Vec<u8>, f64>)) -> *mut (mcts::Node, BTreeMap<Vec<u8>, f64>) {
+pub unsafe extern fn mcts_poll(game: *mut game::Game, iterations: usize, forward_only: bool, mut sess: *mut (mcts::Node, BTreeMap<Vec<u8>, f64>)) -> *mut (mcts::Node, BTreeMap<Vec<u8>, f64>) {
     let game = &*game;
     let first_call = sess.is_null();
 
@@ -362,13 +342,9 @@ pub unsafe extern fn mcts_poll(game: *mut game::Game, iterations: usize, mut ses
         }
     }
 
-    match mcts::mcts_poll(game, iterations, (root, map)) {
+    match mcts::mcts_poll(game, iterations, forward_only, (root, map)) {
         Ok((_next_state, action)) => {
-            write_json_buffer(&json!({
-                "from": action.from,
-                "to": action.to,
-                "path": action.path
-            }));
+            write_json_buffer(&json!([action.0, action.1]));
             let _ = Box::from_raw(sess);
             std::ptr::null_mut()
         },
