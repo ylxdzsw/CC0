@@ -25,7 +25,6 @@ do ->
         buffer[1] = encoded.length
 
     window.softmax_expectation = (x, temp = 0.2, invert = false) ->
-        console.log x
         write_wasm_json x
         cc0.softmax_expectation temp, invert
 
@@ -118,22 +117,19 @@ do ->
             await sleep 0
             cc0.alphabeta app.game.ptr, do app.get_alphabeta_depth
             await sleep 0
-            action = do read_wasm_json
-            [action.from, action.to]
+            do read_wasm_json
 
     player_menu.add "Greedy + Heuristic", null, class
         move: ->
             await sleep 0
             cc0.greedy app.game.ptr, do app.get_temperature
             await sleep 0
-            action = do read_wasm_json
-            [action.from, action.to]
+            do read_wasm_json
 
     player_menu.add "MCTS + Heuristic", null, class
         move: ->
             await sleep 0
             cc0.mcts app.game.ptr, do app.get_mcts_iter
             await sleep 0
-            action = do read_wasm_json
-            [action.from, action.to]
+            do read_wasm_json
 

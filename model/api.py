@@ -144,10 +144,8 @@ def set_random_seed(seed):
 
 def alphabeta(game, depth):
     libcc0.alphabeta(game.ptr, depth)
-    action = read_wasm_json()
-    return [action["from"], action["to"]]
+    return read_wasm_json()
 
 def greedy(game, temperature):
     libcc0.greedy(game.ptr, temperature)
-    action = read_wasm_json()
-    return [action["from"], action["to"]]
+    return read_wasm_json()

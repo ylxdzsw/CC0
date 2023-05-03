@@ -98,6 +98,9 @@ window.app =
     get_alphabeta_depth: ->
         Number document.querySelector('#alphabeta-depth-slider').value
 
+    get_forward_only: ->
+        document.querySelector('#forward-only').checked
+
     # role: 0: empty, 1: self piece, 2: opponenet piece
     pos_info: (pos) ->
         role = switch

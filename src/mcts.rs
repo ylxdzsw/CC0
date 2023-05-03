@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::{game::{Game, Action}, random_shuffle};
+use crate::{game::{Game, Action}, random_shuffle, INVALID_POSITION};
 
 pub struct Node {
     game: Game,
@@ -12,8 +12,12 @@ pub struct Node {
 }
 
 impl Node {
-    fn expand(&mut self, score_map: &BTreeMap<Vec<u8>, f64>) -> Result<bool, Vec<Vec<u8>>> { // the bool indicates if the node is leaf
-        let (next_states, actions) = self.game.expand(true);
+    fn expand(&mut self, forward_only: bool, score_map: &BTreeMap<Vec<u8>, f64>) -> Result<bool, Vec<Vec<u8>>> { // the bool indicates if the node is leaf
+        let (next_states, actions) = if forward_only {
+            self.game.expand_forward_only(true)
+        } else {
+            self.game.expand(true)
+        };
 
         if next_states.is_empty() {
             return Ok(true)
@@ -54,11 +58,11 @@ impl Node {
         }).unwrap()
     }
 
-    fn playout(&mut self, score_map: &BTreeMap<Vec<u8>, f64>) -> Result<f64, Vec<Vec<u8>>> {
+    fn playout(&mut self, forward_only: bool, score_map: &BTreeMap<Vec<u8>, f64>) -> Result<f64, Vec<Vec<u8>>> {
         if self.children.is_empty() {
             self.n_visits += 1;
 
-            let leaf_value = if self.expand(score_map)? { // is leaf
+            let leaf_value = if self.expand(forward_only, score_map)? { // is leaf
                 match self.game.p1_distance().cmp(&self.game.p2_distance()) {
                     std::cmp::Ordering::Less => 1.,
                     std::cmp::Ordering::Greater => 0.,
@@ -86,7 +90,7 @@ impl Node {
             return Ok(leaf_value)
         }
 
-        let leaf_value = self.select().playout(score_map)?;
+        let leaf_value = self.select().playout(forward_only, score_map)?;
 
         self.n_visits += 1;
         self.value += (leaf_value - self.value) / self.n_visits as f64;
@@ -95,15 +99,15 @@ impl Node {
 }
 
 pub fn new_session(game: Game) -> (Node, BTreeMap<Vec<u8>, f64>) {
-    let action = Action { from: 255, to: 255, path: vec![] };
+    let action = Action(INVALID_POSITION, INVALID_POSITION);
     (Node { game, action, children: Vec::new(), n_visits: 0, priori: 0.5, value: 0.5 }, BTreeMap::new())
 }
 
-pub fn mcts_poll(_game: &Game, itertions: usize, sess: (&mut Node, &BTreeMap<Vec<u8>, f64>)) -> Result<(Game, Action), Vec<Vec<u8>>> {
+pub fn mcts_poll(_game: &Game, itertions: usize, forward_only: bool, sess: (&mut Node, &BTreeMap<Vec<u8>, f64>)) -> Result<(Game, Action), Vec<Vec<u8>>> {
     let (root, score_map) = sess;
 
     while root.n_visits < itertions {
-        root.playout(score_map)?;
+        root.playout(forward_only, score_map)?;
     }
 
     Ok(root.children.iter().max_by_key(|child| child.n_visits).map(|child| (child.game.clone(), child.action.clone())).unwrap())
@@ -113,7 +117,7 @@ pub fn mcts(game: &Game, itertions: usize) -> (Game, Action) {
     let (mut root, mut score_map) = new_session(game.clone());
 
     loop {
-        match mcts_poll(game, itertions, (&mut root, &score_map)) {
+        match mcts_poll(game, itertions, false, (&mut root, &score_map)) {
             Ok((game, action)) => return (game, action),
             Err(no_prioris) => {
                 for key in no_prioris {

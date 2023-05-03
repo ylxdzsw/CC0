@@ -56,46 +56,43 @@ do ->
         move: ->
             await sleep 0
 
-            sess = cc0.alphabeta_poll app.game.ptr, app.get_alphabeta_depth(), 0
+            sess = cc0.alphabeta_poll app.game.ptr, app.get_alphabeta_depth(), app.get_forward_only(), 0
             await sleep 0
 
             while sess != 0
                 keys = do read_wasm_json
                 write_wasm_json ([key, await window.model.score app.game, key] for key in keys)
-                sess = cc0.alphabeta_poll app.game.ptr, app.get_alphabeta_depth(), sess
+                sess = cc0.alphabeta_poll app.game.ptr, app.get_alphabeta_depth(), app.get_forward_only(), sess
                 await sleep 0
 
-            action = do read_wasm_json
-            [action.from, action.to]
+            do read_wasm_json
 
     player_menu.add "Greedy + Model", ['small'], class
         move: ->
             await sleep 0
 
-            sess = cc0.greedy_poll app.game.ptr, app.get_temperature(), 0
+            sess = cc0.greedy_poll app.game.ptr, app.get_temperature(), app.get_forward_only(), 0
             await sleep 0
 
             while sess != 0
                 keys = do read_wasm_json
                 write_wasm_json ([key, await window.model.score app.game, key] for key in keys)
-                sess = cc0.greedy_poll app.game.ptr, app.get_temperature(), sess
+                sess = cc0.greedy_poll app.game.ptr, app.get_temperature(), app.get_forward_only(), sess
                 await sleep 0
 
-            action = do read_wasm_json
-            [action.from, action.to]
+            do read_wasm_json
 
     player_menu.add "MCTS + Model", ['small'], class
         move: ->
             await sleep 0
 
-            sess = cc0.mcts_poll app.game.ptr, app.get_mcts_iter(), 0
+            sess = cc0.mcts_poll app.game.ptr, app.get_mcts_iter(), app.get_forward_only(), 0
             await sleep 0
 
             while sess != 0
                 keys = do read_wasm_json
                 write_wasm_json ([key, await window.model.score app.game, key] for key in keys)
-                sess = cc0.mcts_poll app.game.ptr, app.get_mcts_iter(), sess
+                sess = cc0.mcts_poll app.game.ptr, app.get_mcts_iter(), app.get_forward_only(), sess
                 await sleep 0
 
-            action = do read_wasm_json
-            [action.from, action.to]
+            do read_wasm_json
