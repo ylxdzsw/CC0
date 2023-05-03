@@ -129,7 +129,7 @@ if __name__ == '__main__':
     dummy_game = Game(board_type)
     model = torch.jit.script(Model(dummy_game.board_size).cuda())
     # optimizer = torch.optim.AdamW(model.parameters(), lr=5e-6, weight_decay=1e-2)
-    optimizer = torch.optim.SGD(model.parameters(), lr=1e-5, weight_decay=1e-2)
+    optimizer = torch.optim.SGD(model.parameters(), lr=5e-6, weight_decay=1e-2)
     r = -1
 
     try:
@@ -175,5 +175,5 @@ if __name__ == '__main__':
         train(model, optimizer, data)
         save({ 'r': r, 'board_type': board_type, 'model_state_dict': model.state_dict(), 'optimizer_state_dict': optimizer.state_dict() }, "model_{:03}".format(r))
 
-        if r > 20:
+        if r > 30:
             break
