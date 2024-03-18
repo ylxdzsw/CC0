@@ -195,6 +195,20 @@ pub unsafe extern fn game_get_status(game: *mut game::Game) -> u8 {
     }
 }
 
+// a score used by model2
+#[no_mangle]
+pub unsafe extern fn game_distance_diff_score(game: *mut game::Game) -> f64 {
+    let game = &*game;
+    let d1 = game.p1_distance();
+    let d2 = game.p2_distance();
+    if d1 == d2 {
+        return 0.
+    }
+
+    let diff = d1 as f64 - d2 as f64;
+    return diff.signum() * (1. + diff.abs().sqrt()) / 2.
+}
+
 #[no_mangle]
 pub unsafe extern fn game_move_to(game: *mut game::Game, from: u8, to: u8) {
     let game = &mut *game;

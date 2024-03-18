@@ -6,7 +6,7 @@
 <title>CC0</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@svgdotjs/svg.js@3.0/dist/svg.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.14/dist/ort.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17/dist/ort.min.js"></script>
 
 <script>
 window.wasm_ready = (async () => {
@@ -28,7 +28,7 @@ window.cc0 = x.instance.exports
 [require](model.coffee)
 
 <div id="bottom-notice">
-Copyright © 2023: cc0@ylxdzsw.com <br>
+Copyright © 2023-2024: cc0@ylxdzsw.com <br>
 <a href="https://github.com/ylxdzsw/CC0">Source code available under the MIT license</a>
 </div>
 

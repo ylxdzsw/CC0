@@ -43,6 +43,9 @@ libcc0.game_p2_pieces.restype = None
 libcc0.game_get_status.argtypes = [ctypes.c_void_p]
 libcc0.game_get_status.restype = ctypes.c_uint8
 
+libcc0.game_distance_diff_score.argtypes = [ctypes.c_void_p]
+libcc0.game_distance_diff_score.restype = ctypes.c_double
+
 libcc0.game_move_to.argtypes = [ctypes.c_void_p, ctypes.c_uint8, ctypes.c_uint8]
 libcc0.game_move_to.restype = None
 
@@ -114,8 +117,12 @@ class Game:
     def get_status(self):
         return libcc0.game_get_status(self.ptr)
 
+    def distance_diff_score(self):
+        return libcc0.game_distance_diff_score(self.ptr)
+
     def move_to(self, from_pos, to_pos):
         libcc0.game_move_to(self.ptr, from_pos, to_pos)
+        return self
 
     def possible_moves_with_path(self, piece):
         libcc0.game_possible_moves_with_path(self.ptr, piece)
@@ -135,6 +142,7 @@ class Game:
     def load_key(self, key):
         write_wasm_json(key)
         libcc0.game_load_key(self.ptr)
+        return self
 
     def __del__(self):
         libcc0.free_game(self.ptr)
