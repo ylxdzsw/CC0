@@ -26,7 +26,7 @@ def gen_data(board_type):
         child_scores = []
         for i, key in enumerate(child_keys):
             game.load_key(key)
-            if target_model != None and game.get_status() != 0:
+            if target_model != None and game.get_status() == 0:
                 child_scores.append(predictions[i].item())
             else:
                 child_scores.append(game.distance_diff_score())
@@ -86,14 +86,14 @@ def train(model, optimizer, data):
     for encoded_states, scores in dataloader:
         predicted_scores = model(encoded_states.cuda())
         loss = torch.nn.functional.mse_loss(predicted_scores, scores.cuda())
-        total_loss += loss.item() / 100
+        total_loss += loss.item() / 1000
         optimizer.zero_grad() # important! default is accumulation
         loss.backward()
         # torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         optimizer.step()
 
         i += 1
-        if i % 100 == 0:
+        if i % 1000 == 0:
             print(total_loss, flush=True)
             total_loss = 0
 

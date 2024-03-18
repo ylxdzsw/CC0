@@ -107,13 +107,13 @@ class RMLP(torch.nn.Module):
         super(RMLP, self).__init__()
         self.encoder = torch.nn.Linear(1 + 2 * board_size, 1024)
         self.blocks = torch.nn.Sequential(
+            Block(1024, 512),
             Block(1024, 256),
+            Block(1024, 512),
             Block(1024, 256),
+            Block(1024, 512),
             Block(1024, 256),
-            Block(1024, 256),
-            Block(1024, 256),
-            Block(1024, 256),
-            Block(1024, 256),
+            Block(1024, 512),
             Block(1024, 256),
             torch.nn.ReLU(),
         )
