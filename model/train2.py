@@ -13,10 +13,22 @@ def gen_data(board_type):
     game = Game(board_type)
 
     data = [] # (encoded_inputs, score)
+    visited = set()
 
-    while game.get_status() == 0:
+    while True:
         original_key = game.key()
+        visited.add(tuple(original_key))
+
         child_keys = game.expand()
+        if len(child_keys) == 0:
+            break # finished
+
+        if game.turn() >= 10 * game.n_pieces:
+            return [] # too long
+
+        child_keys = [ key for key in child_keys if tuple(key) not in visited ]
+        if len(child_keys) == 0:
+            return [] # stuck
 
         if target_model != None:
             batched_input = [ Model.encode_input(game, key) for key in child_keys ]
@@ -33,14 +45,11 @@ def gen_data(board_type):
 
         game.load_key(original_key)
 
-        if game.turn() >= 4:
+        if game.turn() >= 4: # skip the first two moves
             selection_index = -1 if game.is_p1_moving_next() else 0
             data.append((Model.encode_input(game, original_key), sorted(child_scores)[selection_index]))
 
-        if game.turn() >= 10 * game.n_pieces: # force end overly long games
-            break
-
-        sign = 1 if game.is_p1_moving_next() else -1
+        sign = 50 if game.is_p1_moving_next() else -50 # temperature: 0.02
         probs = torch.softmax(torch.tensor(child_scores) * sign, 0)
         game.load_key(child_keys[torch.multinomial(probs, 1).item()])
 
@@ -49,6 +58,7 @@ def gen_data(board_type):
 def worker_init(target_model_path):
     import os
     set_random_seed(os.getpid() * 97 + 39393)
+    torch.manual_seed(os.getpid() * 97 + 39393)
 
     global target_model
     if target_model_path is None:
@@ -123,7 +133,12 @@ def main():
         optimizer.load_state_dict(checkpoint['optimizer'])
         print("model loaded")
     except:
-        print("model initialized")
+        try:
+            model.load_state_dict(target_model_checkpoint['model'])
+            optimizer.load_state_dict(target_model_checkpoint['optimizer'])
+            print("model loaded from target model")
+        except:
+            print("model initialized from scratch")
 
     while True:
         print("collecting data")
