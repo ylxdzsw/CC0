@@ -1,22 +1,31 @@
 import torch
 import numpy as np
-from multiprocessing import Pool
-from api import Game, set_random_seed, greedy, alphabeta
+import multiprocessing as mp
+from api import Game, set_random_seed
 from model import Model
 from tqdm import tqdm
-
-# otherwise it reports a problem that I don't bother to solve
-torch.multiprocessing.set_sharing_strategy('file_system')
 
 def gen_data(board_type):
     global target_model
     game = Game(board_type)
 
     data = [] # (encoded_inputs, score)
+    visited = set()
 
-    while game.get_status() == 0:
+    while True:
         original_key = game.key()
+        visited.add(tuple(original_key))
+
         child_keys = game.expand()
+        if len(child_keys) == 0:
+            break # finished
+
+        if game.turn() >= 10 * game.n_pieces:
+            return [] # too long
+
+        child_keys = [ key for key in child_keys if tuple(key) not in visited ]
+        if len(child_keys) == 0:
+            return [] # stuck
 
         if target_model != None:
             batched_input = [ Model.encode_input(game, key) for key in child_keys ]
@@ -33,14 +42,11 @@ def gen_data(board_type):
 
         game.load_key(original_key)
 
-        if game.turn() >= 4:
+        if game.turn() >= 4: # skip the first two moves
             selection_index = -1 if game.is_p1_moving_next() else 0
             data.append((Model.encode_input(game, original_key), sorted(child_scores)[selection_index]))
 
-        if game.turn() >= 10 * game.n_pieces: # force end overly long games
-            break
-
-        sign = 1 if game.is_p1_moving_next() else -1
+        sign = 50 if game.is_p1_moving_next() else -50 # temperature: 0.02
         probs = torch.softmax(torch.tensor(child_scores) * sign, 0)
         game.load_key(child_keys[torch.multinomial(probs, 1).item()])
 
@@ -48,7 +54,12 @@ def gen_data(board_type):
 
 def worker_init(target_model_path):
     import os
-    set_random_seed(os.getpid() * 97 + 39393)
+    import time
+
+    set_random_seed(time.time_ns() + os.getpid() * 97)
+    torch.manual_seed(time.time_ns() + os.getpid() * 97)
+
+    os.sched_setaffinity(0, range(os.cpu_count())) # for unkonwn reason, the affinity is set to 0,1 without this line
 
     global target_model
     if target_model_path is None:
@@ -63,7 +74,9 @@ def worker_init(target_model_path):
         target_model.eval()
 
 def collect_data(target_model_path, spec):
-    with Pool(8, initializer=worker_init, initargs=(target_model_path,)) as pool:
+    mp.set_start_method('spawn')
+
+    with mp.Pool(6, initializer=worker_init, initargs=(target_model_path,)) as pool:
         data_batches = pool.starmap(gen_data, tqdm(spec), chunksize=4)
 
     return [ x for batch in data_batches for x in batch ]
@@ -123,13 +136,17 @@ def main():
         optimizer.load_state_dict(checkpoint['optimizer'])
         print("model loaded")
     except:
-        print("model initialized")
+        try:
+            model.load_state_dict(target_model_checkpoint['model'])
+            # optimizer.load_state_dict(target_model_checkpoint['optimizer'])
+            print("model loaded from target model")
+        except:
+            print("model initialized from scratch")
 
     while True:
         print("collecting data")
-        data = collect_data(target_model_path, [(board_type,)] * 16384)
+        data = collect_data(target_model_path, [(board_type,)] * 38400)
         print("training model")
-        model.train()
         train(model, optimizer, data)
         print("saving checkpoint")
         checkpoint = {

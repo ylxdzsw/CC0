@@ -205,7 +205,7 @@ pub unsafe extern fn game_distance_diff_score(game: *mut game::Game) -> f64 {
         return 0.
     }
 
-    let diff = d1 as f64 - d2 as f64;
+    let diff = d2 as f64 - d1 as f64;
     return diff.signum() * (1. + diff.abs().sqrt()) / 2.
 }
 
