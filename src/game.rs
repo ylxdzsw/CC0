@@ -1,5 +1,3 @@
-use std::vec::Vec;
-
 use crate::{INVALID_POSITION, Position, board::Board};
 
 #[derive(Clone)]
