@@ -1,12 +1,11 @@
 import torch
 import numpy as np
 from api import Game
-from utils import load
 from model import Model
 
 import sys
 
-checkpoint = load(sys.argv[1])
+checkpoint = torch.load(sys.argv[1])
 board_type = checkpoint['board_type']
 dummy_game = Game(board_type)
 model = Model(dummy_game.board_size)
