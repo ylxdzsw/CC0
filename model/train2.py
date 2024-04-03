@@ -74,8 +74,6 @@ def worker_init(target_model_path):
         target_model.eval()
 
 def collect_data(target_model_path, spec):
-    mp.set_start_method('spawn')
-
     with mp.Pool(6, initializer=worker_init, initargs=(target_model_path,)) as pool:
         data_batches = pool.starmap(gen_data, tqdm(spec), chunksize=4)
 
@@ -116,6 +114,8 @@ def main():
     if len(sys.argv) != 3:
         print("Usage: train2.py <target_model_checkpoint|board_type> <training_model_checkpoint>")
         sys.exit(1)
+
+    mp.set_start_method('spawn')
 
     try:
         target_model_checkpoint = torch.load(sys.argv[1])
