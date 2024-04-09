@@ -25,8 +25,14 @@ def run_action(game, model):
         case "greedy":
             action = greedy(game, 0.1)
             game.move_to(*action)
-        case "alphabeta":
+        case "alphabeta2":
+            action = alphabeta(game, 2)
+            game.move_to(*action)
+        case "alphabeta3":
             action = alphabeta(game, 3)
+            game.move_to(*action)
+        case "alphabeta4":
+            action = alphabeta(game, 4)
             game.move_to(*action)
         case _:
             original_key = game.key()
