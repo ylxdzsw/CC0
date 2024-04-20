@@ -50,7 +50,7 @@ def run_action(game, model):
                     child_scores.append(game.distance_diff_score())
 
             game.load_key(original_key)
-            sign = 50 if game.is_p1_moving_next() else -50 # temperature: 0.02
+            sign = 100 if game.is_p1_moving_next() else -100 # temperature: 0.01
             probs = torch.softmax(torch.tensor(child_scores) * sign, 0)
 
             entropy = -torch.sum(probs * torch.log(probs)).item()
@@ -71,6 +71,8 @@ p2_win = 0
 p1_entropy = []
 p2_entropy = []
 
+turns = []
+
 for _ in tqdm(range(200)):
     game = Game("small")
     while game.get_status() == 0:
@@ -81,9 +83,12 @@ for _ in tqdm(range(200)):
     match game.get_status():
         case 1:
             p1_win += 1
+            turns.append(game.turn())
         case 2:
             p2_win += 1
+            turns.append(game.turn())
 
+print("average turns:", np.mean(turns))
 print("p1 win rate:", p1_win / (p1_win + p2_win))
 if len(p1_entropy) > 0:
     print("p1 entropy:", np.mean(p1_entropy))

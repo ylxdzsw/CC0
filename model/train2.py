@@ -46,7 +46,7 @@ def gen_data(board_type):
             selection_index = -1 if game.is_p1_moving_next() else 0
             data.append((Model.encode_input(game, original_key), sorted(child_scores)[selection_index]))
 
-        sign = 50 if game.is_p1_moving_next() else -50 # temperature: 0.02
+        sign = 40 if game.is_p1_moving_next() else -40 # temperature: 0.025
         probs = torch.softmax(torch.tensor(child_scores) * sign, 0)
         game.load_key(child_keys[torch.multinomial(probs, 1).item()])
 
@@ -143,7 +143,8 @@ def main():
         except:
             print("model initialized from scratch")
 
-    while True:
+    # while True:
+    for _ in range(2):
         print("collecting data")
         data = collect_data(target_model_path, [(board_type,)] * 38400)
         print("training model")
